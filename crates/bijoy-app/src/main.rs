@@ -15,6 +15,8 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 const INDEX_HTML: &str = include_str!("../assets/index.html");
+const LOGO_WHITE_PNG: &[u8] = include_bytes!("../assets/logo_white.png");
+const LOGO_BLACK_PNG: &[u8] = include_bytes!("../assets/logo_black.png");
 const PORT: u16 = 8321;
 
 fn main() {
@@ -27,7 +29,7 @@ fn main() {
     }
 
     println!("============================================================");
-    println!("             July36 | জুলাই৩৬ বাংলা কীবোর্ড");
+    println!("         36Julay Bangla Keyboard | ৩৬জুলাই বাংলা কীবোর্ড");
     println!("         Standard BDS 1738:2018 / 1935:2018 / 1520:2018");
     println!("============================================================");
 
@@ -164,6 +166,12 @@ fn handle_http_client(mut stream: TcpStream, engine: Arc<Mutex<BijoyEngine>>) {
         ("GET", "/") => {
             respond_html(&mut stream, INDEX_HTML);
         }
+        ("GET", "/logo_white.png") | ("GET", "/logo.png") => {
+            respond_bytes(&mut stream, LOGO_WHITE_PNG, "image/png");
+        }
+        ("GET", "/logo_black.png") => {
+            respond_bytes(&mut stream, LOGO_BLACK_PNG, "image/png");
+        }
         ("GET", "/api/status") => {
             #[cfg(target_os = "windows")]
             let mode = bijoy_driver_win::get_current_mode();
@@ -269,6 +277,15 @@ fn respond_html(stream: &mut TcpStream, html: &str) {
     let resp = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
         bytes.len()
+    );
+    let _ = stream.write_all(resp.as_bytes());
+    let _ = stream.write_all(bytes);
+}
+
+fn respond_bytes(stream: &mut TcpStream, bytes: &[u8], content_type: &str) {
+    let resp = format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        content_type, bytes.len()
     );
     let _ = stream.write_all(resp.as_bytes());
     let _ = stream.write_all(bytes);

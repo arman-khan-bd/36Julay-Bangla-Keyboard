@@ -27,6 +27,158 @@ static PREVIEW_SUGGESTIONS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static PREVIEW_PINNED: AtomicBool = AtomicBool::new(false);
 static MOUSE_WAS_DOWN: AtomicBool = AtomicBool::new(false);
 
+static LOGO_WHITE_PNG_BYTES: &[u8] = include_bytes!("../assets/logo_white.png");
+static LOGO_BLACK_PNG_BYTES: &[u8] = include_bytes!("../assets/logo_black.png");
+
+pub static IS_DARK_MODE: AtomicBool = AtomicBool::new(true);
+
+unsafe fn detect_system_dark_mode() -> bool {
+    let mut h_key: *mut c_void = std::ptr::null_mut();
+    let subkey = to_wide_str("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize");
+    if RegOpenKeyExW(HKEY_CURRENT_USER, subkey.as_ptr(), 0, KEY_READ, &mut h_key) == 0 {
+        let value_name = to_wide_str("AppsUseLightTheme");
+        let mut data: u32 = 0;
+        let mut data_size: u32 = std::mem::size_of::<u32>() as u32;
+        let mut typ: u32 = 0;
+        let res = RegQueryValueExW(
+            h_key,
+            value_name.as_ptr(),
+            std::ptr::null_mut(),
+            &mut typ,
+            &mut data as *mut u32 as *mut u8,
+            &mut data_size,
+        );
+        RegCloseKey(h_key);
+        if res == 0 {
+            return data == 0; // 0 means Dark mode, 1 means Light mode
+        }
+    }
+    true // default to dark mode
+}
+
+/// Load custom 36Julay logo as Win32 HICON
+/// Uses White Logo on Dark Mode, Black Logo on Light Mode
+pub unsafe fn get_app_icon(size: i32, is_dark: bool) -> HICON {
+    static mut CACHED_WHITE_32: HICON = std::ptr::null_mut();
+    static mut CACHED_WHITE_24: HICON = std::ptr::null_mut();
+    static mut CACHED_WHITE_16: HICON = std::ptr::null_mut();
+    static mut CACHED_BLACK_32: HICON = std::ptr::null_mut();
+    static mut CACHED_BLACK_24: HICON = std::ptr::null_mut();
+    static mut CACHED_BLACK_16: HICON = std::ptr::null_mut();
+
+    let bytes = if is_dark {
+        LOGO_WHITE_PNG_BYTES
+    } else {
+        LOGO_BLACK_PNG_BYTES
+    };
+
+    if is_dark {
+        if size <= 16 {
+            if CACHED_WHITE_16.is_null() {
+                CACHED_WHITE_16 = CreateIconFromResourceEx(
+                    bytes.as_ptr(),
+                    bytes.len() as u32,
+                    1,
+                    0x00030000,
+                    16,
+                    16,
+                    0,
+                );
+            }
+            CACHED_WHITE_16
+        } else if size <= 24 {
+            if CACHED_WHITE_24.is_null() {
+                CACHED_WHITE_24 = CreateIconFromResourceEx(
+                    bytes.as_ptr(),
+                    bytes.len() as u32,
+                    1,
+                    0x00030000,
+                    24,
+                    24,
+                    0,
+                );
+            }
+            CACHED_WHITE_24
+        } else {
+            if CACHED_WHITE_32.is_null() {
+                CACHED_WHITE_32 = CreateIconFromResourceEx(
+                    bytes.as_ptr(),
+                    bytes.len() as u32,
+                    1,
+                    0x00030000,
+                    size,
+                    size,
+                    0,
+                );
+            }
+            CACHED_WHITE_32
+        }
+    } else {
+        if size <= 16 {
+            if CACHED_BLACK_16.is_null() {
+                CACHED_BLACK_16 = CreateIconFromResourceEx(
+                    bytes.as_ptr(),
+                    bytes.len() as u32,
+                    1,
+                    0x00030000,
+                    16,
+                    16,
+                    0,
+                );
+            }
+            CACHED_BLACK_16
+        } else if size <= 24 {
+            if CACHED_BLACK_24.is_null() {
+                CACHED_BLACK_24 = CreateIconFromResourceEx(
+                    bytes.as_ptr(),
+                    bytes.len() as u32,
+                    1,
+                    0x00030000,
+                    24,
+                    24,
+                    0,
+                );
+            }
+            CACHED_BLACK_24
+        } else {
+            if CACHED_BLACK_32.is_null() {
+                CACHED_BLACK_32 = CreateIconFromResourceEx(
+                    bytes.as_ptr(),
+                    bytes.len() as u32,
+                    1,
+                    0x00030000,
+                    size,
+                    size,
+                    0,
+                );
+            }
+            CACHED_BLACK_32
+        }
+    }
+}
+
+pub unsafe fn toggle_theme(hwnd: HWND) {
+    let new_dark = !IS_DARK_MODE.load(std::sync::atomic::Ordering::SeqCst);
+    IS_DARK_MODE.store(new_dark, std::sync::atomic::Ordering::SeqCst);
+
+    // Update tray icon with matching white/black logo
+    let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
+    nid.cb_size = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
+    nid.hwnd = hwnd;
+    nid.u_id = TRAY_ICON_ID;
+    nid.u_flags = NIF_ICON;
+    nid.h_icon = get_app_icon(16, new_dark);
+    Shell_NotifyIconW(NIM_MODIFY, &nid);
+
+    // Repaint top bar
+    InvalidateRect(hwnd, std::ptr::null(), 1);
+
+    // Repaint preview window if visible
+    if let Some(prev) = *PREVIEW_HWND.lock().unwrap() {
+        InvalidateRect(prev.0, std::ptr::null(), 1);
+    }
+}
+
 /// Helper to create high-quality Bengali font with Kalpurush (installed on Windows)
 pub unsafe fn create_bengali_font(height: i32, weight: i32) -> HFONT {
     CreateFontW(
@@ -71,6 +223,12 @@ const ID_MENU_PREVIEW: usize = 3006;
 const ID_MENU_CONVERTER: usize = 3007;
 const ID_MENU_HELP: usize = 3008;
 const ID_MENU_EXIT: usize = 3009;
+const ID_MENU_TRAY: usize = 3010;
+const ID_MENU_SETTINGS: usize = 3011;
+const ID_MENU_ABOUT: usize = 3012;
+const ID_MENU_SHOW_BAR: usize = 3013;
+const ID_MENU_THEME: usize = 3014;
+
 
 // Converter control IDs
 const ID_EDIT_AVRO: usize = 4001;
@@ -85,6 +243,10 @@ const ID_BTN_CLEAR: usize = 4007;
 pub fn run_native_gui() {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
+
+        // Detect system dark mode preference
+        let is_sys_dark = detect_system_dark_mode();
+        IS_DARK_MODE.store(is_sys_dark, std::sync::atomic::Ordering::SeqCst);
 
         // Default query and suggestions start empty
         *PREVIEW_QUERY.lock().unwrap() = String::new();
@@ -124,6 +286,9 @@ pub fn run_native_gui() {
 
 unsafe fn register_classes(h_instance: HINSTANCE) {
     let arrow_cursor = LoadCursorW(std::ptr::null_mut(), IDC_ARROW);
+    let is_dark = IS_DARK_MODE.load(std::sync::atomic::Ordering::SeqCst);
+    let app_icon = get_app_icon(32, is_dark);
+    let app_icon_sm = get_app_icon(16, is_dark);
 
     // Class for Top Bar
     let class_top = to_wide_str("BijoyTopBarClass");
@@ -134,12 +299,12 @@ unsafe fn register_classes(h_instance: HINSTANCE) {
         cb_cls_extra: 0,
         cb_wnd_extra: 0,
         h_instance,
-        h_icon: std::ptr::null_mut(),
+        h_icon: app_icon,
         h_cursor: arrow_cursor,
         hbr_background: std::ptr::null_mut(),
         lpsz_menu_name: std::ptr::null(),
         lpsz_class_name: class_top.as_ptr(),
-        h_icon_sm: std::ptr::null_mut(),
+        h_icon_sm: app_icon_sm,
     };
     RegisterClassExW(&wc_top);
 
@@ -152,12 +317,12 @@ unsafe fn register_classes(h_instance: HINSTANCE) {
         cb_cls_extra: 0,
         cb_wnd_extra: 0,
         h_instance,
-        h_icon: std::ptr::null_mut(),
+        h_icon: app_icon,
         h_cursor: arrow_cursor,
         hbr_background: std::ptr::null_mut(),
         lpsz_menu_name: std::ptr::null(),
         lpsz_class_name: class_preview.as_ptr(),
-        h_icon_sm: std::ptr::null_mut(),
+        h_icon_sm: app_icon_sm,
     };
     RegisterClassExW(&wc_preview);
 
@@ -170,12 +335,12 @@ unsafe fn register_classes(h_instance: HINSTANCE) {
         cb_cls_extra: 0,
         cb_wnd_extra: 0,
         h_instance,
-        h_icon: std::ptr::null_mut(),
+        h_icon: app_icon,
         h_cursor: arrow_cursor,
         hbr_background: CreateSolidBrush(rgb(240, 242, 245)),
         lpsz_menu_name: std::ptr::null(),
         lpsz_class_name: class_conv.as_ptr(),
-        h_icon_sm: std::ptr::null_mut(),
+        h_icon_sm: app_icon_sm,
     };
     RegisterClassExW(&wc_conv);
 
@@ -188,28 +353,28 @@ unsafe fn register_classes(h_instance: HINSTANCE) {
         cb_cls_extra: 0,
         cb_wnd_extra: 0,
         h_instance,
-        h_icon: std::ptr::null_mut(),
+        h_icon: app_icon,
         h_cursor: arrow_cursor,
         hbr_background: CreateSolidBrush(rgb(18, 24, 38)),
         lpsz_menu_name: std::ptr::null(),
         lpsz_class_name: class_vk.as_ptr(),
-        h_icon_sm: std::ptr::null_mut(),
+        h_icon_sm: app_icon_sm,
     };
     RegisterClassExW(&wc_vk);
 }
 
 // ============================================================================
-// 1. TOP FLOATING KEYBOARD BAR (IMAGE 1)
+// 1. TOP FLOATING KEYBOARD BAR - SLEEK & COMPACT DESIGN
 // ============================================================================
 unsafe fn create_top_bar_window(h_instance: HINSTANCE) -> HWND {
     let screen_w = GetSystemMetrics(SM_CXSCREEN);
-    let bar_w = 430;
-    let bar_h = 36;
+    let bar_w = 260;
+    let bar_h = 32;
     let bar_x = (screen_w - bar_w) / 2;
-    let bar_y = 6;
+    let bar_y = 8;
 
     let class_name = to_wide_str("BijoyTopBarClass");
-    let title = to_wide_str("July36 বাংলা কীবোর্ড");
+    let title = to_wide_str("36Julay Bangla Keyboard");
 
     let hwnd = CreateWindowExW(
         WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
@@ -244,137 +409,139 @@ unsafe extern "system" fn top_bar_wnd_proc(
             let mut rc: RECT = std::mem::zeroed();
             GetClientRect(hwnd, &mut rc);
 
-            // Dark sleek gradient-like background (Image 1)
-            let brush_bg = CreateSolidBrush(rgb(18, 24, 38));
+            let is_dark = IS_DARK_MODE.load(std::sync::atomic::Ordering::SeqCst);
+
+            let (bg_color, border_color, pill_bg, text_color, sub_text_color, dot_color) = if is_dark {
+                (
+                    rgb(15, 23, 42),    // Obsidian Slate 900
+                    rgb(51, 65, 85),    // Border Slate 700
+                    rgb(30, 41, 59),    // Pill Slate 800
+                    rgb(241, 245, 249), // Pure crisp white
+                    rgb(148, 163, 184), // Slate 400
+                    rgb(203, 213, 225), // Slate 300
+                )
+            } else {
+                (
+                    rgb(248, 250, 252), // Pearl Slate 50
+                    rgb(203, 213, 225), // Border Slate 300
+                    rgb(226, 232, 240), // Pill Slate 200
+                    rgb(15, 23, 42),    // Crisp black Slate 900
+                    rgb(100, 116, 139), // Slate 500
+                    rgb(51, 65, 85),    // Slate 700
+                )
+            };
+
+            let brush_bg = CreateSolidBrush(bg_color);
             FillRect(hdc, &rc, brush_bg);
             DeleteObject(brush_bg as *mut c_void);
 
-            // Subtle border around bar
-            let brush_border = CreateSolidBrush(rgb(56, 75, 105));
+            let brush_border = CreateSolidBrush(border_color);
             let old_brush = SelectObject(hdc, brush_border as *mut c_void);
-            RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, 8, 8);
+            RoundRect(hdc, rc.left, rc.top, rc.right, rc.bottom, 12, 12);
             SelectObject(hdc, old_brush);
             DeleteObject(brush_border as *mut c_void);
 
             SetBkMode(hdc, TRANSPARENT);
 
-            // 1. Golden 'অ' Logo on Left (Image 1)
-            let font_logo = create_bengali_font(24, 800);
-            let old_font = SelectObject(hdc, font_logo as *mut c_void);
-            SetTextColor(hdc, rgb(246, 173, 85)); // Golden color
+            // 1. Custom 36Julay Logo on Left (x: 5, y: 4, 24x24 px)
+            // White logo on dark mode, Black logo on light mode
+            let icon = get_app_icon(24, is_dark);
+            if !icon.is_null() {
+                DrawIconEx(hdc, 5, 4, icon, 24, 24, 0, std::ptr::null_mut(), DI_NORMAL);
+            }
 
-            let mut logo_rc = RECT { left: 8, top: 2, right: 34, bottom: 34 };
-            let logo_text = to_wide_str("অ");
-            DrawTextW(hdc, logo_text.as_ptr(), -1, &mut logo_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-            SelectObject(hdc, old_font);
-            DeleteObject(font_logo as *mut c_void);
+            // 2. Mode / Layout Selector Button (x: 32 to 195)
+            let layout_bg = CreateSolidBrush(pill_bg);
+            let old_b2 = SelectObject(hdc, layout_bg as *mut c_void);
+            RoundRect(hdc, 33, 4, 195, 28, 8, 8);
+            SelectObject(hdc, old_b2);
+            DeleteObject(layout_bg as *mut c_void);
 
-            // 2. Layout Selector Area (Image 1: "English ▼")
             let mode = *CURRENT_MODE_CACHED.lock().unwrap();
             let mode_label = match mode {
-                BijoyMode::Unicode => "July36 ▼",
+                BijoyMode::Unicode => "36Julay ▼",
                 BijoyMode::Classic => "বিজয় ক্লাসিক ▼",
                 BijoyMode::Avro => "অভ্র ফোনেটিক ▼",
                 BijoyMode::English => "English ▼",
             };
 
             let font_text = CreateFontW(
-                15, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 5, 0,
+                14, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 5, 0,
                 to_wide_str("Segoe UI").as_ptr(),
             );
             let old_font2 = SelectObject(hdc, font_text as *mut c_void);
-            SetTextColor(hdc, rgb(238, 242, 255)); // Crisp white
+            SetTextColor(hdc, text_color);
 
-            let mut layout_rc = RECT { left: 40, top: 4, right: 165, bottom: 32 };
+            let mut layout_rc = RECT { left: 40, top: 4, right: 190, bottom: 28 };
             let label_w = to_wide_str(mode_label);
             DrawTextW(hdc, label_w.as_ptr(), -1, &mut layout_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // 3. Icons on Right matching Image 1:
-            // ⌨️ Keyboard (x: 180), 👔/📝 Preview (x: 215), ⚙️ Settings (x: 250), 🌐 Web/Converter (x: 285), ❓ Help (x: 320), ℹ️ Info (x: 355), ✕ Exit (x: 390)
-            let icons = [
-                (175, 205, "⌨"),
-                (210, 240, "📝"),
-                (245, 275, "⚙"),
-                (280, 310, "🌐"),
-                (315, 345, "❓"),
-                (350, 380, "ℹ"),
-                (385, 415, "✕"),
-            ];
-
-            let font_icon = CreateFontW(
-                16, 0, 0, 0, 500, 0, 0, 0, 1, 0, 0, 5, 0,
-                to_wide_str("Segoe UI Emoji").as_ptr(),
+            // 3. Move to System Tray button (x: 198 to 226)
+            let font_sym = CreateFontW(
+                13, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 5, 0,
+                to_wide_str("Segoe UI Symbol").as_ptr(),
             );
-            SelectObject(hdc, font_icon as *mut c_void);
-            SetTextColor(hdc, rgb(180, 200, 230));
+            SelectObject(hdc, font_sym as *mut c_void);
+            SetTextColor(hdc, sub_text_color);
 
-            for (x1, x2, symbol) in icons {
-                let mut btn_rc = RECT { left: x1, top: 4, right: x2, bottom: 32 };
-                let sym_w = to_wide_str(symbol);
-                DrawTextW(hdc, sym_w.as_ptr(), -1, &mut btn_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-            }
+            let mut tray_btn_rc = RECT { left: 198, top: 4, right: 226, bottom: 28 };
+            let tray_w = to_wide_str("🗕");
+            DrawTextW(hdc, tray_w.as_ptr(), -1, &mut tray_btn_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+
+            // 4. 3-Dot Menu button (x: 228 to 256)
+            let font_dots = CreateFontW(
+                18, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 5, 0,
+                to_wide_str("Segoe UI").as_ptr(),
+            );
+            SelectObject(hdc, font_dots as *mut c_void);
+            SetTextColor(hdc, dot_color);
+
+            let mut dot_btn_rc = RECT { left: 228, top: 4, right: 256, bottom: 28 };
+            let dots_w = to_wide_str("⋮");
+            DrawTextW(hdc, dots_w.as_ptr(), -1, &mut dot_btn_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
             SelectObject(hdc, old_font2);
             DeleteObject(font_text as *mut c_void);
-            DeleteObject(font_icon as *mut c_void);
+            DeleteObject(font_sym as *mut c_void);
+            DeleteObject(font_dots as *mut c_void);
 
             EndPaint(hwnd, &ps);
             0
         }
         WM_LBUTTONDOWN => {
             let x = (lparam & 0xFFFF) as i16 as i32;
-            let _y = ((lparam >> 16) & 0xFFFF) as i16 as i32;
 
-            // If clicked on layout selector (x: 35..165), open layout menu
-            if x >= 35 && x <= 165 {
+            // 0. Click logo on left (x: 0..32) to toggle Dark / Light mode!
+            if x < 32 {
+                toggle_theme(hwnd);
+                return 0;
+            }
+
+            // 1. If clicked on layout selector (x: 32..195), open layout menu
+            if x >= 32 && x <= 195 {
                 show_layout_popup_menu(hwnd);
                 return 0;
             }
 
-            // If clicked on icons:
-            if x >= 175 && x <= 205 {
-                // ⌨️ Keyboard toggle
-                show_virtual_keyboard();
-                return 0;
-            }
-            if x >= 210 && x <= 240 {
-                // 📝 Preview window toggle
-                toggle_preview_window();
-                return 0;
-            }
-            if x >= 245 && x <= 275 {
-                // ⚙️ Settings
-                show_settings_dialog(hwnd);
-                return 0;
-            }
-            if x >= 280 && x <= 310 {
-                // 🌐 Converter window
-                show_converter_window();
-                return 0;
-            }
-            if x >= 315 && x <= 345 {
-                // ❓ Help
-                show_help_dialog(hwnd);
-                return 0;
-            }
-            if x >= 350 && x <= 380 {
-                // ℹ Info
-                show_about_dialog(hwnd);
-                return 0;
-            }
-            if x >= 385 && x <= 425 {
-                // ✕ Minimize to tray
+            // 2. If clicked on Move to Tray button (x: 196..226): hide top bar to tray
+            if x >= 196 && x <= 226 {
                 ShowWindow(hwnd, SW_HIDE);
                 return 0;
             }
 
-            // Click and drag support for the bar anywhere else!
+            // 3. If clicked on 3-Dot menu button (x: 227..260): open 3-dot menu with Close and Move to Tray
+            if x >= 227 && x <= 260 {
+                show_three_dots_menu(hwnd);
+                return 0;
+            }
+
+            // 4. Click and drag support for the bar anywhere else!
             ReleaseCapture();
             SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION as WPARAM, 0);
             0
         }
         WM_RBUTTONUP => {
-            show_tray_popup_menu(hwnd);
+            show_three_dots_menu(hwnd);
             0
         }
         WM_TIMER => {
@@ -449,10 +616,15 @@ unsafe extern "system" fn top_bar_wnd_proc(
             0
         }
         WM_TRAYICON => {
-            if lparam as u32 == WM_LBUTTONUP {
+            let evt = lparam as u32;
+            const WM_LBUTTONDBLCLK: u32 = 0x0203;
+            // Double click or single left click on tray icon: show top bar on top!
+            if evt == WM_LBUTTONDBLCLK || evt == WM_LBUTTONUP {
                 ShowWindow(hwnd, SW_SHOW);
+                SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
                 SetForegroundWindow(hwnd);
-            } else if lparam as u32 == WM_RBUTTONUP {
+            } else if evt == WM_RBUTTONUP {
+                // Right click on tray icon: change layout directly!
                 show_tray_popup_menu(hwnd);
             }
             0
@@ -476,10 +648,21 @@ unsafe extern "system" fn top_bar_wnd_proc(
                     bijoy_driver_win::set_current_mode(BijoyMode::Avro);
                     InvalidateRect(hwnd, std::ptr::null(), 1);
                 }
+                ID_MENU_TRAY => {
+                    ShowWindow(hwnd, SW_HIDE);
+                }
+                ID_MENU_SHOW_BAR => {
+                    ShowWindow(hwnd, SW_SHOW);
+                    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    SetForegroundWindow(hwnd);
+                }
                 ID_MENU_KEYBOARD => show_virtual_keyboard(),
                 ID_MENU_PREVIEW => toggle_preview_window(),
                 ID_MENU_CONVERTER => show_converter_window(),
                 ID_MENU_HELP => show_help_dialog(hwnd),
+                ID_MENU_SETTINGS => show_settings_dialog(hwnd),
+                ID_MENU_ABOUT => show_about_dialog(hwnd),
+                ID_MENU_THEME => toggle_theme(hwnd),
                 ID_MENU_EXIT => {
                     PostQuitMessage(0);
                 }
@@ -542,34 +725,66 @@ unsafe extern "system" fn preview_wnd_proc(
             let mut rc: RECT = std::mem::zeroed();
             GetClientRect(hwnd, &mut rc);
 
-            // 1. Title bar (Image 2: "📝 Preview Window  📌")
+            let is_dark = IS_DARK_MODE.load(std::sync::atomic::Ordering::SeqCst);
+            let (title_bg, title_fg, query_bg, query_fg, sel_bg, sel_fg, uns_bg, uns_fg) = if is_dark {
+                (
+                    rgb(30, 41, 59),     // Title Slate 800
+                    rgb(241, 245, 249),  // Crisp white
+                    rgb(15, 23, 42),     // Slate 900
+                    rgb(251, 191, 36),   // Amber 400
+                    rgb(2, 132, 199),    // Sky 600
+                    rgb(255, 255, 255),  // Pure white
+                    rgb(30, 41, 59),     // Slate 800
+                    rgb(226, 232, 240),  // Slate 200
+                )
+            } else {
+                (
+                    rgb(235, 237, 240),  // Light grey
+                    rgb(30, 41, 59),     // Slate 800
+                    rgb(255, 255, 224),  // Pale yellow
+                    rgb(0, 0, 0),        // Pure black
+                    rgb(0, 120, 215),    // Royal blue
+                    rgb(255, 255, 255),  // Pure white
+                    rgb(255, 255, 255),  // Crisp white
+                    rgb(20, 20, 20),     // Dark text
+                )
+            };
+
+            // 1. Title bar (Preview Window + 36Julay Logo + Pin)
             let title_rc = RECT { left: 0, top: 0, right: rc.right, bottom: 26 };
-            let brush_title = CreateSolidBrush(rgb(235, 237, 240));
+            let brush_title = CreateSolidBrush(title_bg);
             FillRect(hdc, &title_rc, brush_title);
             DeleteObject(brush_title as *mut c_void);
 
             SetBkMode(hdc, TRANSPARENT);
+
+            // Draw theme-aware logo on title bar
+            let icon = get_app_icon(16, is_dark);
+            if !icon.is_null() {
+                DrawIconEx(hdc, 6, 5, icon, 16, 16, 0, std::ptr::null_mut(), DI_NORMAL);
+            }
+
             let font_title = CreateFontW(13, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Segoe UI").as_ptr());
             let old_font = SelectObject(hdc, font_title as *mut c_void);
-            SetTextColor(hdc, rgb(30, 41, 59));
+            SetTextColor(hdc, title_fg);
 
-            let mut t_rc = RECT { left: 8, top: 0, right: rc.right - 24, bottom: 26 };
-            let t_text = to_wide_str("📝 Preview Window");
+            let mut t_rc = RECT { left: 28, top: 0, right: rc.right - 24, bottom: 26 };
+            let t_text = to_wide_str("36Julay Preview");
             DrawTextW(hdc, t_text.as_ptr(), -1, &mut t_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
             let mut pin_rc = RECT { left: rc.right - 24, top: 0, right: rc.right - 4, bottom: 26 };
             let pin_text = to_wide_str(if PREVIEW_PINNED.load(std::sync::atomic::Ordering::SeqCst) { "📍" } else { "📌" });
             DrawTextW(hdc, pin_text.as_ptr(), -1, &mut pin_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // 2. Query Row (Image 2: bold query on pale yellow background)
+            // 2. Query Row
             let query_rc = RECT { left: 0, top: 26, right: rc.right, bottom: 58 };
-            let brush_query = CreateSolidBrush(rgb(255, 255, 224)); // Pale yellow (Image 2)
+            let brush_query = CreateSolidBrush(query_bg);
             FillRect(hdc, &query_rc, brush_query);
             DeleteObject(brush_query as *mut c_void);
 
             let font_query = CreateFontW(17, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Segoe UI").as_ptr());
             SelectObject(hdc, font_query as *mut c_void);
-            SetTextColor(hdc, rgb(0, 0, 0));
+            SetTextColor(hdc, query_fg);
 
             let query = PREVIEW_QUERY.lock().unwrap();
             let mut q_rc = RECT { left: 8, top: 26, right: rc.right - 8, bottom: 58 };
@@ -588,16 +803,15 @@ unsafe extern "system" fn preview_wnd_proc(
                 let item_rc = RECT { left: 0, top: y1, right: rc.right, bottom: y2 };
 
                 if idx == 0 {
-                    // Selected item in royal blue (Image 2)
-                    let brush_sel = CreateSolidBrush(rgb(0, 120, 215));
+                    let brush_sel = CreateSolidBrush(sel_bg);
                     FillRect(hdc, &item_rc, brush_sel);
                     DeleteObject(brush_sel as *mut c_void);
-                    SetTextColor(hdc, rgb(255, 255, 255));
+                    SetTextColor(hdc, sel_fg);
                 } else {
-                    let brush_item = CreateSolidBrush(rgb(255, 255, 255));
+                    let brush_item = CreateSolidBrush(uns_bg);
                     FillRect(hdc, &item_rc, brush_item);
                     DeleteObject(brush_item as *mut c_void);
-                    SetTextColor(hdc, rgb(20, 20, 20));
+                    SetTextColor(hdc, uns_fg);
                 }
 
                 let mut text_rc = RECT { left: 8, top: y1, right: rc.right - 8, bottom: y2 };
@@ -668,7 +882,7 @@ pub fn show_converter_window() {
         let y = (screen_h - h) / 2;
 
         let class_name = to_wide_str("BijoyConverterClass");
-        let title = to_wide_str("July36 - অভ্র ⇄ ৩৬জুলাই কনভার্টার | BDS 1738");
+        let title = to_wide_str("36Julay Bangla Keyboard - অভ্র ⇄ ৩৬জুলাই কনভার্টার");
 
         let hwnd = CreateWindowExW(
             WS_EX_CLIENTEDGE,
@@ -863,7 +1077,7 @@ unsafe fn show_layout_popup_menu(hwnd: HWND) {
     let f_avr = if current == BijoyMode::Avro { MF_CHECKED } else { MF_UNCHECKED };
 
     AppendMenuW(h_menu, MF_STRING | f_eng, ID_MENU_ENGLISH, to_wide_str("🇬🇧 English (Ctrl+Alt+E)").as_ptr());
-    AppendMenuW(h_menu, MF_STRING | f_uni, ID_MENU_UNICODE, to_wide_str("🇧🇩 July36 (Ctrl+Alt+V)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING | f_uni, ID_MENU_UNICODE, to_wide_str("🇧🇩 36Julay (Ctrl+Alt+V)").as_ptr());
     AppendMenuW(h_menu, MF_STRING | f_cla, ID_MENU_CLASSIC, to_wide_str("🔤 বিজয় ক্লাসিক - SutonnyMJ (Ctrl+Alt+B)").as_ptr());
     AppendMenuW(h_menu, MF_STRING | f_avr, ID_MENU_AVRO, to_wide_str("🗣️ অভ্র ফোনেটিক - Avro (F12)").as_ptr());
 
@@ -876,18 +1090,59 @@ unsafe fn show_layout_popup_menu(hwnd: HWND) {
 
 unsafe fn show_tray_popup_menu(hwnd: HWND) {
     let h_menu = CreatePopupMenu();
+    let current = bijoy_driver_win::get_current_mode();
 
-    AppendMenuW(h_menu, MF_STRING, ID_MENU_UNICODE, to_wide_str("🇧🇩 July36 (Ctrl+Alt+V)").as_ptr());
-    AppendMenuW(h_menu, MF_STRING, ID_MENU_CLASSIC, to_wide_str("🔤 বিজয় ক্লাসিক (Ctrl+Alt+B)").as_ptr());
-    AppendMenuW(h_menu, MF_STRING, ID_MENU_AVRO, to_wide_str("🗣️ অভ্র ফোনেটিক (F12)").as_ptr());
-    AppendMenuW(h_menu, MF_STRING, ID_MENU_ENGLISH, to_wide_str("🇬🇧 English (Ctrl+Alt+E)").as_ptr());
+    let f_uni = if current == BijoyMode::Unicode { MF_CHECKED } else { MF_UNCHECKED };
+    let f_cla = if current == BijoyMode::Classic { MF_CHECKED } else { MF_UNCHECKED };
+    let f_avr = if current == BijoyMode::Avro { MF_CHECKED } else { MF_UNCHECKED };
+    let f_eng = if current == BijoyMode::English { MF_CHECKED } else { MF_UNCHECKED };
+
+    AppendMenuW(h_menu, MF_STRING | f_uni, ID_MENU_UNICODE, to_wide_str("🇧🇩 36Julay (Ctrl+Alt+V)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING | f_cla, ID_MENU_CLASSIC, to_wide_str("🔤 বিজয় ক্লাসিক - SutonnyMJ (Ctrl+Alt+B)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING | f_avr, ID_MENU_AVRO, to_wide_str("🗣️ অভ্র ফোনেটিক (F12)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING | f_eng, ID_MENU_ENGLISH, to_wide_str("🇬🇧 English (Ctrl+Alt+E)").as_ptr());
     AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_SHOW_BAR, to_wide_str("🔝 টপ বার দেখান (Show Top Bar)").as_ptr());
     AppendMenuW(h_menu, MF_STRING, ID_MENU_KEYBOARD, to_wide_str("⌨️ ভার্চুয়াল কীবোর্ড").as_ptr());
     AppendMenuW(h_menu, MF_STRING, ID_MENU_PREVIEW, to_wide_str("📝 প্রিভিউ উইন্ডো").as_ptr());
     AppendMenuW(h_menu, MF_STRING, ID_MENU_CONVERTER, to_wide_str("🌐 টেক্সট কনভার্টার").as_ptr());
     AppendMenuW(h_menu, MF_STRING, ID_MENU_HELP, to_wide_str("❓ টাইপিং নির্দেশিকা").as_ptr());
+    let theme_text = if IS_DARK_MODE.load(std::sync::atomic::Ordering::SeqCst) {
+        "☀️ লাইট মোড চালু করুন (Switch to Light Mode)"
+    } else {
+        "🌙 ডার্ক মোড চালু করুন (Switch to Dark Mode)"
+    };
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_THEME, to_wide_str(theme_text).as_ptr());
     AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null());
     AppendMenuW(h_menu, MF_STRING, ID_MENU_EXIT, to_wide_str("❌ প্রস্থান (Exit)").as_ptr());
+
+    let mut pt: POINT = std::mem::zeroed();
+    GetCursorPos(&mut pt);
+    SetForegroundWindow(hwnd);
+    TrackPopupMenu(h_menu, TPM_LEFTALIGN | TPM_TOPALIGN, pt.x, pt.y, 0, hwnd, std::ptr::null());
+    DestroyMenu(h_menu);
+}
+
+unsafe fn show_three_dots_menu(hwnd: HWND) {
+    let h_menu = CreatePopupMenu();
+
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_TRAY, to_wide_str("📥 সিস্টেম ট্রে-তে মিনিমাইজ (Move to Tray)").as_ptr());
+    AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null());
+    let theme_text = if IS_DARK_MODE.load(std::sync::atomic::Ordering::SeqCst) {
+        "☀️ লাইট মোড চালু করুন (Switch to Light Mode)"
+    } else {
+        "🌙 ডার্ক মোড চালু করুন (Switch to Dark Mode)"
+    };
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_THEME, to_wide_str(theme_text).as_ptr());
+    AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_KEYBOARD, to_wide_str("⌨️ ভার্চুয়াল কীবোর্ড (Virtual Keyboard)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_PREVIEW, to_wide_str("📝 প্রিভিউ উইন্ডো (Preview Window)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_CONVERTER, to_wide_str("🌐 অভ্র ⇄ ৩৬জুলাই কনভার্টার (Converter)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_HELP, to_wide_str("❓ টাইপিং নির্দেশিকা (Help Guide)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_SETTINGS, to_wide_str("⚙️ সেটিংস (Settings)").as_ptr());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_ABOUT, to_wide_str("ℹ️ পরিচিতি (About 36Julay)").as_ptr());
+    AppendMenuW(h_menu, MF_SEPARATOR, 0, std::ptr::null());
+    AppendMenuW(h_menu, MF_STRING, ID_MENU_EXIT, to_wide_str("❌ প্রস্থান ও বন্ধ (Close & Exit)").as_ptr());
 
     let mut pt: POINT = std::mem::zeroed();
     GetCursorPos(&mut pt);
@@ -934,7 +1189,7 @@ pub fn show_virtual_keyboard() {
         let y = screen_h - h - 60;
 
         let class_name = to_wide_str("BijoyVirtualKeyboardClass");
-        let title = to_wide_str("July36 কীবোর্ড লেআউট | National Standard BDS 1738:2018");
+        let title = to_wide_str("36Julay কীবোর্ড লেআউট | National Standard BDS 1738:2018");
 
         let hwnd = CreateWindowExW(
             0,
@@ -1087,38 +1342,38 @@ unsafe extern "system" fn vk_wnd_proc(
 
 unsafe fn show_help_dialog(parent: HWND) {
     let msg = to_wide_str(
-        "July36 বাংলা কীবোর্ড নির্দেশিকা (BDS 1738)\n\n\
+        "36Julay Bangla Keyboard নির্দেশিকা (BDS 1738)\n\n\
         • স্বরবর্ণ: F=অ, gf=আ, gd=ই, gD=ঈ, gs=উ, ga=ঋ, gc=এ, gC=ঐ, x=ও, gX=ঔ\n\
         • প্রি-কার: dk=তি, ck=তে, ckf=তো, ckX=তৌ\n\
         • যুক্তাক্ষর (g দিয়ে): jgk=ক্ত, jgN=ক্ষ, ugI=জ্ঞ, igm=হ্ম, Igd=ঞ্চি\n\
         • রেফ ও ফলা: Aj=র্ক, jz=ক্র, jZ=ক্য\n\
         • মুদ্রা ও বিশেষ: g1..g8=আনা/গণ্ডা, g,=ৰ, g.=ৱ, g#=ঽ, gG=॥\n\n\
-        হটকি: F12 (টগল), Ctrl+Alt+V (July36), Ctrl+Alt+B (ক্লাসিক), Ctrl+Alt+E (ইংরেজি)",
+        হটকি: F12 (টগল), Ctrl+Alt+V (36Julay), Ctrl+Alt+B (ক্লাসিক), Ctrl+Alt+E (ইংরেজি)",
     );
-    let title = to_wide_str("📖 July36 টাইপিং নির্দেশিকা");
+    let title = to_wide_str("📖 36Julay Bangla Keyboard নির্দেশিকা");
     MessageBoxW(parent, msg.as_ptr(), title.as_ptr(), 0x00000040);
 }
 
 unsafe fn show_settings_dialog(parent: HWND) {
     let msg = to_wide_str(
-        "July36 কীবোর্ড সেটিংস:\n\n\
+        "36Julay Bangla Keyboard সেটিংস:\n\n\
         ✓ সিস্টেম-ওয়াইড লো-লেভেল কীবোর্ড হুক সক্রিয় আছে\n\
         ✓ উইন্ডোজ স্টার্টআপ অটো-রান চালু আছে\n\
         ✓ প্রিভিউ উইন্ডো রিয়েল-টাইম প্রেডিকশন চালু আছে\n\n\
-        হটকি: Ctrl+Alt+V (July36), Ctrl+Alt+B (ক্লাসিক), F12 (অভ্র), Ctrl+Alt+E (ইংরেজি)",
+        হটকি: Ctrl+Alt+V (36Julay), Ctrl+Alt+B (ক্লাসিক), F12 (অভ্র), Ctrl+Alt+E (ইংরেজি)",
     );
-    let title = to_wide_str("⚙️ July36 সেটিংস");
+    let title = to_wide_str("⚙️ 36Julay Bangla Keyboard সেটিংস");
     MessageBoxW(parent, msg.as_ptr(), title.as_ptr(), 0x00000040);
 }
 
 unsafe fn show_about_dialog(parent: HWND) {
     let msg = to_wide_str(
-        "July36 বাংলা কীবোর্ড (July36 Keyboard)\n\
+        "36Julay Bangla Keyboard (৩৬জুলাই বাংলা কীবোর্ড)\n\
         সংস্করণ: ১.০.০ (Version 1.0.0 Native Windows)\n\
         জাতীয় মান: BDS 1738:2018 / 1935:2018 / 1520:2018\n\n\
         উইন্ডোজের জন্য সম্পূর্ণ নেটিভ ডেস্কটপ কীবোর্ড সফটওয়্যার।",
     );
-    let title = to_wide_str("ℹ️ July36 পরিচিতি");
+    let title = to_wide_str("ℹ️ 36Julay Bangla Keyboard পরিচিতি");
     MessageBoxW(parent, msg.as_ptr(), title.as_ptr(), 0x00000040);
 }
 
@@ -1129,11 +1384,12 @@ unsafe fn setup_tray_icon(hwnd: HWND, _h_instance: HINSTANCE) {
     let mut nid: NOTIFYICONDATAW = std::mem::zeroed();
     nid.cb_size = std::mem::size_of::<NOTIFYICONDATAW>() as u32;
     nid.hwnd = hwnd;
-    nid.u_id = TRAY_ICON_ID;
-    nid.u_flags = NIF_MESSAGE | NIF_TIP;
+    nid.u_flags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     nid.u_callback_message = WM_TRAYICON;
+    let is_dark = IS_DARK_MODE.load(std::sync::atomic::Ordering::SeqCst);
+    nid.h_icon = get_app_icon(16, is_dark);
 
-    let tip = to_wide_str("July36 বাংলা কীবোর্ড");
+    let tip = to_wide_str("36Julay Bangla Keyboard");
     let copy_len = tip.len().min(127);
     nid.sz_tip[..copy_len].copy_from_slice(&tip[..copy_len]);
 

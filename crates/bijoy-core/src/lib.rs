@@ -25,7 +25,9 @@ mod tests {
         for ch in input.chars() {
             let out = engine.process_char(ch);
             if out.delete_count > 0 {
-                for _ in 0..out.delete_count {
+                let chars: Vec<char> = text.chars().collect();
+                let cl_len = engine::get_last_grapheme_cluster_chars(&chars).len();
+                for _ in 0..cl_len {
                     text.pop();
                 }
             }
@@ -33,6 +35,7 @@ mod tests {
         }
         text
     }
+
 
     #[test]
     fn test_independent_vowels() {

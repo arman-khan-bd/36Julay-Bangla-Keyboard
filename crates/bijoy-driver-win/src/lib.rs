@@ -385,16 +385,26 @@ unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: WPARAM, lpa
         return CallNextHookEx(hook, code, wparam, lparam);
     }
 
-    // Handle Backspace
+    // Handle Backspace: Deletes precisely ONE letter/hosonto, preventing OS from deleting entire conjunct
+    let vk_idx = (kbd.vk_code & 0xFF) as usize;
     if kbd.vk_code == VK_BACK {
         if is_down {
             let mut lock = ENGINE.lock().unwrap();
             if let Some(engine) = lock.as_mut() {
-                engine.process_char('\x08');
+                if let Some((del, text)) = engine.handle_backspace() {
+                    KEY_CONSUMED[vk_idx].store(true, Ordering::SeqCst);
+                    inject_output(del, &text);
+                    return 1; // Block default OS backspace
+                }
+            }
+        } else if is_up {
+            if KEY_CONSUMED[vk_idx].swap(false, Ordering::SeqCst) {
+                return 1;
             }
         }
         return CallNextHookEx(hook, code, wparam, lparam);
     }
+
 
     // Special keys like Enter, Tab, Escape, Arrows, Function keys: reset engine & pass through
     if kbd.vk_code == VK_RETURN
@@ -417,13 +427,13 @@ unsafe extern "system" fn low_level_keyboard_proc(code: i32, wparam: WPARAM, lpa
     }
 
     // Key-up handling: if key down was consumed, consume key up cleanly
-    let vk_idx = (kbd.vk_code & 0xFF) as usize;
     if is_up {
         if KEY_CONSUMED[vk_idx].swap(false, Ordering::SeqCst) {
             return 1;
         }
         return CallNextHookEx(hook, code, wparam, lparam);
     }
+
 
     // Translate virtual key to Unicode char
     let mut key_state = [0u8; 256];

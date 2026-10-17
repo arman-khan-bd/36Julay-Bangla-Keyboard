@@ -98,6 +98,8 @@ pub const NIF_MESSAGE: u32 = 0x00000001;
 pub const NIF_ICON: u32 = 0x00000002;
 pub const NIF_TIP: u32 = 0x00000004;
 
+pub const DI_NORMAL: u32 = 0x0003;
+
 pub const SM_CXSCREEN: i32 = 0;
 pub const SM_CYSCREEN: i32 = 1;
 
@@ -187,6 +189,7 @@ pub struct NOTIFYICONDATAW {
 #[link(name = "gdi32")]
 #[link(name = "shell32")]
 #[link(name = "kernel32")]
+#[link(name = "advapi32")]
 extern "system" {
     pub fn GetModuleHandleW(lpModuleName: *const u16) -> HINSTANCE;
     pub fn RegisterClassExW(lpwcx: *const WNDCLASSEXW) -> u16;
@@ -236,6 +239,26 @@ extern "system" {
     pub fn GetCursorPos(lpPoint: *mut POINT) -> i32;
     pub fn GetAsyncKeyState(vKey: i32) -> i16;
     pub fn ReleaseCapture() -> i32;
+    pub fn CreateIconFromResourceEx(
+        pbIconBits: *const u8,
+        cbIconBits: u32,
+        fIcon: i32,
+        dwVersion: u32,
+        cxDesired: i32,
+        cyDesired: i32,
+        uFlags: u32,
+    ) -> HICON;
+    pub fn DrawIconEx(
+        hdc: HDC,
+        xLeft: i32,
+        yTop: i32,
+        hIcon: HICON,
+        cxWidth: i32,
+        cyWidth: i32,
+        istepIfAniCur: u32,
+        hbrFlickerFreeDraw: HBRUSH,
+        diFlags: u32,
+    ) -> i32;
     pub fn SendMessageW(hWnd: HWND, Msg: u32, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
     pub fn PostMessageW(hWnd: HWND, Msg: u32, wParam: WPARAM, lParam: LPARAM) -> i32;
     pub fn PostQuitMessage(nExitCode: i32);
@@ -304,7 +327,28 @@ extern "system" {
 
     // SHELL32
     pub fn Shell_NotifyIconW(dwMessage: u32, lpData: *const NOTIFYICONDATAW) -> i32;
+
+    // ADVAPI32
+    pub fn RegOpenKeyExW(
+        hKey: *mut c_void,
+        lpSubKey: *const u16,
+        ulOptions: u32,
+        samDesired: u32,
+        phkResult: *mut *mut c_void,
+    ) -> i32;
+    pub fn RegQueryValueExW(
+        hKey: *mut c_void,
+        lpValueName: *const u16,
+        lpReserved: *mut u32,
+        lpType: *mut u32,
+        lpData: *mut u8,
+        lpcbData: *mut u32,
+    ) -> i32;
+    pub fn RegCloseKey(hKey: *mut c_void) -> i32;
 }
+
+pub const HKEY_CURRENT_USER: *mut c_void = 0x80000001usize as *mut c_void;
+pub const KEY_READ: u32 = 0x20019;
 
 #[inline]
 pub fn rgb(r: u8, g: u8, b: u8) -> COLORREF {

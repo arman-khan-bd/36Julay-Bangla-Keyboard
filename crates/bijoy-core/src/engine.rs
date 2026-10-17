@@ -146,6 +146,65 @@ impl BijoyEngine {
         None
     }
 
+    /// Intelligent Backspace: Deletes precisely ONE letter, vowel mark, or hosonto (্)
+    /// instead of letting Windows delete the entire conjunct or syllable at once.
+    pub fn handle_backspace(&mut self) -> Option<(usize, String)> {
+        if self.mode == BijoyMode::English {
+            return None;
+        }
+
+        if self.mode == BijoyMode::Avro {
+            if !self.avro_buffer.is_empty() {
+                self.avro_buffer.pop();
+                return None;
+            }
+            return None;
+        }
+
+        if self.mode == BijoyMode::Unicode {
+            if self.current_word.is_empty() {
+                self.reset();
+                return None;
+            }
+
+            let mut chars: Vec<char> = self.current_word.chars().collect();
+            if chars.is_empty() {
+                self.reset();
+                return None;
+            }
+
+            // Identify the last grapheme cluster before popping
+            let cluster_chars: Vec<char> = get_last_grapheme_cluster_chars(&chars).to_vec();
+            let cluster_len = cluster_chars.len();
+
+            // Pop one character from word
+            chars.pop();
+            self.current_word = chars.iter().collect();
+
+            self.pending_pre_kar = None;
+            self.pending_link = false;
+
+            if cluster_len <= 1 {
+                // Standalone single character was deleted
+                self.consonant_with_ekar = false;
+                self.consonant_just_typed = false;
+                self.last_consonant_cluster.clear();
+                return Some((1, String::new()));
+            } else {
+                // Multi-character conjunct or consonant + vowel-sign cluster.
+                // Windows backspace deletes the ENTIRE cluster at once!
+                // We restore the remaining prefix of that cluster so only ONE letter/hosonto was removed.
+                let remaining_cluster: String = cluster_chars[..cluster_len - 1].iter().collect();
+                self.consonant_with_ekar = remaining_cluster.ends_with('ে');
+                self.consonant_just_typed = !remaining_cluster.is_empty();
+                self.last_consonant_cluster = remaining_cluster.clone();
+                return Some((1, remaining_cluster));
+            }
+        }
+
+        None
+    }
+
     /// Process a printable character key event.
     pub fn process_char(&mut self, ch: char) -> EngineOutput {
         if self.mode == BijoyMode::English {
@@ -178,8 +237,12 @@ impl BijoyEngine {
             if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
                 self.current_word.clear();
             } else {
-                for _ in 0..out.delete_count {
-                    self.current_word.pop();
+                if out.delete_count > 0 {
+                    let chars: Vec<char> = self.current_word.chars().collect();
+                    let cluster_len = get_last_grapheme_cluster_chars(&chars).len();
+                    for _ in 0..cluster_len {
+                        self.current_word.pop();
+                    }
                 }
                 if !out.insert_text.is_empty() {
                     self.current_word.push_str(&out.insert_text);
@@ -228,7 +291,7 @@ impl BijoyEngine {
 
     /// Internal unicode processing logic for Bijoy 36July (BDS 1738)
     fn process_unicode(&mut self, ch: char) -> EngineOutput {
-        // Check for 'g' (Link / Virama)
+        // Check for 'g' (Link / Virama / Hasanta)
         if ch == 'g' {
             if self.pending_link {
                 // Double 'g' emits standalone Virama / Hasanta
@@ -264,8 +327,8 @@ impl BijoyEngine {
                 if self.consonant_with_ekar {
                     // cluster ended with 'ে' (e.g., 'কে' from 'c' + 'j')
                     // Now user pressed 'g' + 'k' ('ত'):
-                    // Replace 'ে' with '্' + c2 + 'ে' => 'ক্তে'
-                    let mut s = String::new();
+                    // Replace 'কে' with 'ক্তে'
+                    let mut s = self.last_consonant_cluster.clone();
                     s.push('\u{09CD}');
                     s.push(c2);
                     s.push('ে');
@@ -316,7 +379,8 @@ impl BijoyEngine {
             if self.consonant_with_ekar {
                 // e.g. 'কে' + 'z' => 'ক্রে'
                 self.consonant_just_typed = true;
-                return EngineOutput::replace(1, "্রে");
+                let cluster = self.last_consonant_cluster.clone();
+                return EngineOutput::replace(1, format!("{}্রে", cluster));
             } else if !self.last_consonant_cluster.is_empty() {
                 let r_phala = "্\u{09B0}"; // virama + ra
                 self.last_consonant_cluster.push_str(r_phala);
@@ -332,7 +396,8 @@ impl BijoyEngine {
             if self.consonant_with_ekar {
                 // e.g. 'কে' + 'Z' => 'ক্যে'
                 self.consonant_just_typed = true;
-                return EngineOutput::replace(1, "্যে");
+                let cluster = self.last_consonant_cluster.clone();
+                return EngineOutput::replace(1, format!("{}্যে", cluster));
             } else if !self.last_consonant_cluster.is_empty() {
                 let ya_phala = "্\u{09AF}"; // virama + ya
                 self.last_consonant_cluster.push_str(ya_phala);
@@ -345,17 +410,27 @@ impl BijoyEngine {
 
         // Check for O-kar ('ো') and Ou-kar ('ৌ') right after an e-kar:
         // 'c' + consonant + 'f' => 'ো', 'c' + consonant + 'X' => 'ৌ'
+        // CRITICAL FIX: Because Windows Backspace deletes the entire base consonant + vowel sign cluster (e.g. "সে"),
+        // the replacement MUST include the base consonant cluster so it becomes "সো" or "কৌ" and not empty " ো"!
         if self.consonant_with_ekar {
             if ch == 'f' {
                 self.consonant_with_ekar = false;
                 self.consonant_just_typed = false;
-                // Delete 'ে', replace with 'ো'
-                return EngineOutput::replace(1, "ো");
+                let cluster = if !self.last_consonant_cluster.is_empty() {
+                    self.last_consonant_cluster.clone()
+                } else {
+                    String::new()
+                };
+                return EngineOutput::replace(1, format!("{}{}", cluster, 'ো'));
             } else if ch == 'X' {
                 self.consonant_with_ekar = false;
                 self.consonant_just_typed = false;
-                // Delete 'ে', replace with 'ৌ'
-                return EngineOutput::replace(1, "ৌ");
+                let cluster = if !self.last_consonant_cluster.is_empty() {
+                    self.last_consonant_cluster.clone()
+                } else {
+                    String::new()
+                };
+                return EngineOutput::replace(1, format!("{}{}", cluster, 'ৌ'));
             }
             self.consonant_with_ekar = false;
         }
@@ -369,7 +444,7 @@ impl BijoyEngine {
                 _ => unreachable!(),
             };
 
-            // Traditional Bijoy typing order: pre-kar typed BEFORE consonant (e.g. ি + ক => কি)
+            // Traditional Bijoy typing order: pre-kar typed BEFORE consonant (e.g. ি + ক => কি, ে + স + া => সো)
             // Buffer pre-kar in memory; DO NOT emit unattached combining mark to target application!
             // When the consonant is typed, consonant + pre-kar are inserted together atomically with 0 backspaces!
             self.pending_pre_kar = Some(kar);
@@ -378,6 +453,7 @@ impl BijoyEngine {
             self.last_consonant_cluster.clear();
             return EngineOutput::insert(""); // buffered silently
         }
+
 
         // Key lookup
         if let Some(key_type) = map_key(ch) {
@@ -584,3 +660,139 @@ pub fn map_sutonny_char(ch: char) -> Option<&'static str> {
         _ => None,
     }
 }
+
+pub fn is_bengali_vowel_sign(c: char) -> bool {
+    matches!(c, '\u{09BE}'..='\u{09CC}' | '\u{09D7}')
+}
+
+pub fn is_bengali_modifier(c: char) -> bool {
+    matches!(c, '\u{0981}'..='\u{0983}')
+}
+
+/// Extract the last Bengali grapheme cluster from a slice of characters.
+/// Handles multi-character conjuncts (e.g. ক্ত, ক্ষ, জ্ঞ), vowel signs (া, ি, ী, ু, ূ, ৃ, ে, ৈ, ো, ৌ),
+/// modifiers (ঁ, ং, ঃ), virama (্), and ref (র্).
+pub fn get_last_grapheme_cluster_chars(chars: &[char]) -> &[char] {
+    if chars.is_empty() {
+        return chars;
+    }
+    let mut i = chars.len() - 1;
+
+    // Skip trailing modifiers (chandrabindu, anusvara, visarga)
+    while i > 0 && is_bengali_modifier(chars[i]) {
+        i -= 1;
+    }
+
+    // Skip vowel sign if present
+    if i > 0 && is_bengali_vowel_sign(chars[i]) {
+        i -= 1;
+    }
+
+    // If standing on virama alone (hasanta at end), step back to the consonant it modifies
+    if i > 0 && chars[i] == '\u{09CD}' {
+        i -= 1;
+    }
+
+    // Step back across conjuncts (consonants preceded by virama)
+    while i >= 2 && chars[i - 1] == '\u{09CD}' {
+        i -= 2;
+    }
+
+    // If preceded by Ref (র + ্):
+    if i >= 2 && chars[i - 1] == '\u{09CD}' && chars[i - 2] == 'র' {
+        i -= 2;
+    }
+
+    &chars[i..]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn type_word(engine: &mut BijoyEngine, input: &str) -> String {
+        let mut text = String::new();
+        for ch in input.chars() {
+            let out = engine.process_char(ch);
+            if out.delete_count > 0 {
+                let chars: Vec<char> = text.chars().collect();
+                let cl_len = get_last_grapheme_cluster_chars(&chars).len();
+                for _ in 0..cl_len {
+                    text.pop();
+                }
+            }
+            text.push_str(&out.insert_text);
+        }
+        text
+    }
+
+    #[test]
+    fn test_typing_sonar_classic_and_logical() {
+        let mut engine = BijoyEngine::new();
+        // Classic Bijoy order: c (ে) + n (স) + f (া) => সো, then b (ন) + f (া) + v (র) => সোনার
+        let res = type_word(&mut engine, "cnfbনি");
+        assert!(res.starts_with("সো"));
+
+        let mut engine2 = BijoyEngine::new();
+        // Test "সো" directly
+        let res_so = type_word(&mut engine2, "cnf");
+        assert_eq!(res_so, "সো");
+
+        let mut engine3 = BijoyEngine::new();
+        // Test "কৌ" (c + j + X)
+        let res_kou = type_word(&mut engine3, "cjX");
+        assert_eq!(res_kou, "কৌ");
+    }
+
+    #[test]
+    fn test_typing_conjunct_with_ekar() {
+        let mut engine = BijoyEngine::new();
+        // c + j + g + k => ক্তে
+        let res = type_word(&mut engine, "cjgk");
+        assert_eq!(res, "ক্তে");
+    }
+
+    #[test]
+    fn test_intelligent_backspace_on_conjunct() {
+        let mut engine = BijoyEngine::new();
+        // Type "ক্ত" (j + g + k)
+        let text = type_word(&mut engine, "jgk");
+        assert_eq!(text, "ক্ত");
+        assert_eq!(engine.current_word, "ক্ত");
+
+        // Backspace 1: deletes 'ত', restores 'ক্' (with hosonto!)
+        let bs1 = engine.handle_backspace().unwrap();
+        assert_eq!(bs1, (1, "ক্".to_string()));
+        assert_eq!(engine.current_word, "ক্");
+
+        // Backspace 2: deletes '্', restores 'ক'
+        let bs2 = engine.handle_backspace().unwrap();
+        assert_eq!(bs2, (1, "ক".to_string()));
+        assert_eq!(engine.current_word, "ক");
+
+        // Backspace 3: deletes 'ক'
+        let bs3 = engine.handle_backspace().unwrap();
+        assert_eq!(bs3, (1, "".to_string()));
+        assert_eq!(engine.current_word, "");
+    }
+
+    #[test]
+    fn test_intelligent_backspace_on_vowel_sign() {
+        let mut engine = BijoyEngine::new();
+        // Type "সো" (c + n + f)
+        let text = type_word(&mut engine, "cnf");
+        assert_eq!(text, "সো");
+        assert_eq!(engine.current_word, "সো");
+
+        // Backspace 1: deletes 'ো', restores 'স'
+        let bs1 = engine.handle_backspace().unwrap();
+        assert_eq!(bs1, (1, "স".to_string()));
+        assert_eq!(engine.current_word, "স");
+
+        // Backspace 2: deletes 'স'
+        let bs2 = engine.handle_backspace().unwrap();
+        assert_eq!(bs2, (1, "".to_string()));
+        assert_eq!(engine.current_word, "");
+    }
+}
+

@@ -1,10 +1,10 @@
 [package]
-name = "july36"
+name = "julay36"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "July36"
+name = "36Julay"
 path = "src/main.rs"
 
 [dependencies]

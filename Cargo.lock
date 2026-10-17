@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "july36"
+name = "julay36"
 version = "0.1.0"
 dependencies = [
  "bijoy-core",

@@ -72,18 +72,29 @@
             user-select: none;
         }
 
-        /* Golden 'অ' Logo */
+        /* 36Julay Brand Logo */
         .bar-logo {
-            font-family: 'Hind Siliguri', serif;
-            font-size: 22px;
-            font-weight: 700;
-            color: var(--accent-gold);
-            text-shadow: 
-                0 0 10px rgba(245, 158, 11, 0.8),
-                0 1px 2px rgba(0, 0, 0, 0.9);
-            padding: 0 6px 0 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
             cursor: pointer;
-            line-height: 1;
+            transition: transform 0.15s ease;
+        }
+        .bar-logo:hover {
+            transform: scale(1.08);
+        }
+        .bar-logo img.logo-img {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            border-radius: 50%;
+        }
+        body.light-mode .bar-logo img.logo-white { display: none !important; }
+        body.light-mode .bar-logo img.logo-black { display: block !important; }
+        @media (prefers-color-scheme: light) {
+            body:not(.dark-mode) .bar-logo img.logo-white { display: none !important; }
+            body:not(.dark-mode) .bar-logo img.logo-black { display: block !important; }
         }
 
         /* Layout Dropdown */
@@ -530,8 +541,11 @@
          ======================================================================== -->
     <div class="top-keyboard-bar-container">
         <div class="top-keyboard-bar">
-            <!-- Golden 'অ' Logo -->
-            <div class="bar-logo" onclick="toggleLayoutMenu()" title="বিজয় ৩৬জুলাই বাংলা কীবোর্ড">অ</div>
+            <!-- 36Julay App Logo (White on Dark Mode, Black on Light Mode) -->
+            <div class="bar-logo" onclick="toggleTheme()" title="৩৬জুলাই বাংলা কীবোর্ড (ডার্ক/লাইট মোড পরিবর্তন করতে ক্লিক করুন)">
+                <img src="/logo_white.png" alt="36Julay Logo" class="logo-img logo-white" />
+                <img src="/logo_black.png" alt="36Julay Logo" class="logo-img logo-black" style="display:none;" />
+            </div>
 
             <!-- Keyboard Layout Selector Dropdown -->
             <div class="layout-dropdown">
@@ -882,6 +896,16 @@
             scratchpad.focus();
             updateCounters();
             updatePreviewSuggestions(getCurrentWord(scratchpad.value, newPos));
+        }
+
+        // Theme toggle (Dark / Light)
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            const whiteLogos = document.querySelectorAll('.logo-white');
+            const blackLogos = document.querySelectorAll('.logo-black');
+            whiteLogos.forEach(el => el.style.display = isLight ? 'none' : 'block');
+            blackLogos.forEach(el => el.style.display = isLight ? 'block' : 'none');
         }
 
         // Dropdown toggle

@@ -1,4 +1,4 @@
-# July36 | জুলাই৩৬ বাংলা কীবোর্ড (July36 Bangla Keyboard in Rust)
+# 36Julay | ৩৬জুলাই বাংলা কীবোর্ড (36Julay Bangla Keyboard in Rust)
 ### BDS 1738:2018 / BDS 1935:2018 / BDS 1520:2018 Standard Implementation for Windows + Linux (All Distros)
 
 A ultra-fast, modern, memory-safe Bengali typing keyboard software written in **pure Rust**. Designed from the ground up according to the official **বিজয় নির্দেশিকা (Bijoy Bangla Typing Nirdeshika)** and Bangladesh national keyboard standards.

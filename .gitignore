@@ -6,3 +6,5 @@ install-windows.ps1
 *.exe
 *.pdf
 *.png
+!assets/*.png
+!crates/bijoy-app/assets/*.png

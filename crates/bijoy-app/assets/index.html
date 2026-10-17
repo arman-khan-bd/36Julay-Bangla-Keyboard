@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>বিজয় ৩৬জুলাই বাংলা কীবোর্ড | Bijoy 36July Bangla Keyboard (BDS 1738)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0B0F19;
+            --bg-card: rgba(18, 26, 43, 0.88);
+            --bg-key: #141D30;
+            --bg-key-hover: #1F2A44;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-gold: #F59E0B;
+            --accent-green: #00D27A;
+            --accent-blue: #0078D7;
+            --text-main: #F1F5F9;
+            --text-muted: #94A3B8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', 'Hind Siliguri', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(0, 210, 122, 0.08) 0px, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-top: 52px; /* For fixed top bar */
+            padding-bottom: 60px;
+        }
+
+        /* ==========================================================================
+           1. TOP FLOATING KEYBOARD BAR (EXACTLY LIKE IMAGE 1)
+           ========================================================================== */
+        .top-keyboard-bar-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            padding: 6px 12px;
+            pointer-events: none;
+        }
+
+        .top-keyboard-bar {
+            pointer-events: auto;
+            background: linear-gradient(180deg, #1A2234 0%, #0D1322 100%);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-top: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 6px;
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.6),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            height: 38px;
+            padding: 0 8px;
+            gap: 6px;
+            user-select: none;
+        }
+
+        /* Golden 'অ' Logo */
+        .bar-logo {
+            font-family: 'Hind Siliguri', serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            text-shadow: 
+                0 0 10px rgba(245, 158, 11, 0.8),
+                0 1px 2px rgba(0, 0, 0, 0.9);
+            padding: 0 6px 0 2px;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        /* Layout Dropdown */
+        .layout-dropdown {
+            position: relative;
+        }
+
+        .layout-select-btn {
+            background: transparent;
+            border: none;
+            color: #FFFFFF;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.15s;
+        }
+
+        .layout-select-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .layout-select-btn .caret {
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 4px;
+            background: #101626;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+            min-width: 220px;
+            padding: 6px 0;
+            display: none;
+            z-index: 1010;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 8px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: var(--text-main);
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(0, 210, 122, 0.15);
+            color: var(--accent-green);
+        }
+
+        .dropdown-item.active {
+            color: var(--accent-green);
+            font-weight: 700;
+        }
+
+        .dropdown-item .shortcut {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
+
+        /* Icon Buttons */
+        .bar-btn {
+            background: transparent;
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #C0C8D8;
+            font-size: 15px;
+            transition: all 0.15s;
+            position: relative;
+        }
+
+        .bar-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #FFFFFF;
+        }
+
+        .bar-btn.active {
+            background: rgba(0, 210, 122, 0.2);
+            color: var(--accent-green);
+        }
+
+        /* Distinctive Icons from Image 1 */
+        .icon-keyboard {
+            width: 18px;
+            height: 12px;
+            border: 1.5px solid currentColor;
+            border-radius: 2px;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5px;
+            padding: 1.5px;
+        }
+        .icon-keyboard span { background: currentColor; border-radius: 0.5px; }
+
+        .icon-web {
+            font-size: 16px;
+            color: #38BDF8;
+        }
+
+        .icon-help {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #2563EB;
+            color: #FFF;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .icon-info {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1.5px solid currentColor;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: serif;
+        }
+
+        /* ==========================================================================
+           2. PREVIEW WINDOW (EXACTLY LIKE IMAGE 2)
+           ========================================================================== */
+        .preview-window {
+            position: fixed;
+            top: 70px;
+            right: 40px;
+            width: 260px;
+            background: #FFFDEC; /* Soft parchment from Image 2 */
+            border: 1px solid #71717A;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            border-radius: 3px;
+            z-index: 900;
+            user-select: none;
+            overflow: hidden;
+            display: block;
+        }
+
+        .preview-header {
+            background: linear-gradient(180deg, #E2E8F0 0%, #CBD5E1 100%);
+            border-bottom: 1px solid #94A3B8;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: move;
+        }
+
+        .preview-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #0F172A;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .preview-pin-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            color: #334155;
+            padding: 2px;
+            line-height: 1;
+        }
+
+        .preview-pin-btn.pinned {
+            color: #EF4444;
+            transform: rotate(-30deg);
+        }
+
+        .preview-body {
+            padding: 8px 0;
+            color: #000000;
+        }
+
+        .preview-query {
+            padding: 2px 12px 6px;
+            font-size: 19px;
+            font-weight: 700;
+            color: #000000;
+            font-family: 'Outfit', sans-serif;
+            border-bottom: 1px dashed #CBD5E1;
+            margin-bottom: 4px;
+        }
+
+        .preview-suggestions {
+            list-style: none;
+        }
+
+        .preview-item {
+            padding: 4px 12px;
+            font-size: 18px;
+            font-weight: 500;
+            color: #000000;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: 'Hind Siliguri', sans-serif;
+        }
+
+        .preview-item:hover, .preview-item.selected {
+            background: var(--accent-blue); /* Exact Windows Accent Blue */
+            color: #FFFFFF;
+        }
+
+        .preview-item .item-num {
+            font-size: 11px;
+            opacity: 0.6;
+            font-family: monospace;
+        }
+
+        /* ==========================================================================
+           MAIN CONTENT AREA
+           ========================================================================== */
+        .container {
+            max-width: 1240px;
+            margin: 20px auto 0;
+            padding: 0 16px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 7px 14px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover { background: rgba(255, 255, 255, 0.15); }
+        .btn.primary { background: var(--accent-green); border-color: var(--accent-green); color: #042416; }
+        .btn.primary:hover { background: #00EC8A; }
+
+        /* Scratchpad textarea */
+        .scratchpad {
+            width: 100%;
+            height: 150px;
+            background: #0B101E;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 14px;
+            color: var(--text-main);
+            font-size: 20px;
+            line-height: 1.6;
+            outline: none;
+            resize: vertical;
+        }
+
+        .scratchpad:focus {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+        }
+
+        /* 4-Corner BDS 1738 Virtual Keyboard */
+        .virtual-keyboard-section {
+            background: #0C1220;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+
+        .kb-row {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
+            justify-content: center;
+        }
+
+        .key {
+            background: var(--bg-key);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            width: 58px;
+            height: 58px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.1s ease;
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+            user-select: none;
+        }
+
+        .key:hover { background: var(--bg-key-hover); }
+        .key:active, .key.pressed {
+            transform: translateY(2px);
+            box-shadow: none;
+            border-color: var(--accent-green);
+            background: rgba(0, 210, 122, 0.2);
+        }
+
+        .corner-tl { position: absolute; top: 3px; left: 4px; font-size: 10px; color: var(--accent-green); font-weight: 600; }
+        .corner-tr { position: absolute; top: 3px; right: 4px; font-size: 13px; color: #F43F5E; font-weight: 700; }
+        .corner-bl { position: absolute; bottom: 3px; left: 4px; font-size: 10px; color: #94A3B8; }
+        .corner-br { position: absolute; bottom: 3px; right: 4px; font-size: 14px; color: #38BDF8; font-weight: 700; }
+        .corner-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; color: #64748B; font-weight: 600; }
+
+        .key.backspace { width: 88px; }
+        .key.tab { width: 75px; }
+        .key.caps { width: 90px; }
+        .key.enter { width: 90px; }
+        .key.shift-l, .key.shift-r { width: 110px; }
+        .key.space { width: 320px; }
+        .key.mod { width: 62px; font-size: 11px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-weight: 600; }
+
+        /* Avro to 36July Converter Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-overlay.show { display: flex; }
+
+        .modal {
+            background: #111827;
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            width: 90%;
+            max-width: 900px;
+            padding: 24px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .converter-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .conv-textarea {
+            width: 100%;
+            height: 180px;
+            background: #0B101E;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            color: var(--text-main);
+            font-size: 15px;
+            outline: none;
+            resize: vertical;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #10B981;
+            color: #042416;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s;
+            pointer-events: none;
+            z-index: 3000;
+        }
+        .toast.show { opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+    <!-- ========================================================================
+         1. TOP FLOATING KEYBOARD BAR (IMAGE 1)
+         ======================================================================== -->
+    <div class="top-keyboard-bar-container">
+        <div class="top-keyboard-bar">
+            <!-- Golden 'অ' Logo -->
+            <div class="bar-logo" onclick="toggleLayoutMenu()" title="বিজয় ৩৬জুলাই বাংলা কীবোর্ড">অ</div>
+
+            <!-- Keyboard Layout Selector Dropdown -->
+            <div class="layout-dropdown">
+                <button class="layout-select-btn" id="currentLayoutLabel" onclick="toggleLayoutMenu()">
+                    <span id="layoutNameText">English</span>
+                    <span class="caret">▼</span>
+                </button>
+                <div class="dropdown-menu" id="layoutDropdownMenu">
+                    <div class="dropdown-item active" onclick="selectLayout('English')">
+                        <span>🇬🇧 English</span>
+                        <span class="shortcut">Ctrl+Alt+E</span>
+                    </div>
+                    <div class="dropdown-item" onclick="selectLayout('Unicode')">
+                        <span>🇧🇩 বিজয় ৩৬জুলাই (Unicode)</span>
+                        <span class="shortcut">Ctrl+Alt+V</span>
+                    </div>
+                    <div class="dropdown-item" onclick="selectLayout('Classic')">
+                        <span>🔤 বিজয় ক্লাসিক (SutonnyMJ)</span>
+                        <span class="shortcut">Ctrl+Alt+B</span>
+                    </div>
+                    <div class="dropdown-item" onclick="selectLayout('Avro')">
+                        <span>🗣️ অভ্র ফোনেটিক (Avro)</span>
+                        <span class="shortcut">F12</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Layout Show/Hide Button (Keyboard Icon in Image 1) -->
+            <button class="bar-btn" id="btnToggleKeyboard" onclick="toggleVirtualKeyboard()" title="ভার্চুয়াল কীবোর্ড লেআউট প্রদর্শন (BDS 1738)">
+                <div class="icon-keyboard">
+                    <span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            </button>
+
+            <!-- Preview Window Toggle (Skin/Coat Icon in Image 1) -->
+            <button class="bar-btn" onclick="togglePreviewWindow()" title="প্রিভিউ উইন্ডো অন/অফ (শব্দ পরামর্শ)">
+                👔
+            </button>
+
+            <!-- Settings Button -->
+            <button class="bar-btn" onclick="openSettingsModal()" title="কীবোর্ড সেটিংস">
+                ⚙️
+            </button>
+
+            <!-- Avro to 36July Converter Button (Globe/Web Icon in Image 1) -->
+            <button class="bar-btn" onclick="openConverterModal()" title="অভ্র ⇄ ৩৬জুলাই (বিজয়) কনভার্টার">
+                <span class="icon-web">🌐</span>
+            </button>
+
+            <!-- Help Question Mark Icon -->
+            <button class="bar-btn" onclick="openHelpModal()" title="বিজয় টাইপিং নির্দেশিকা ও যুক্তাক্ষর তালিকা">
+                <div class="icon-help">?</div>
+            </button>
+
+            <!-- Info Icon -->
+            <button class="bar-btn" onclick="openInfoModal()" title="সফ্টওয়্যার পরিচিতি ও ইনস্টলেশন তথ্য">
+                <div class="icon-info">i</div>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================
+         2. PREVIEW WINDOW (IMAGE 2)
+         ======================================================================== -->
+    <div class="preview-window" id="previewWindow">
+        <div class="preview-header" id="previewDragHandle">
+            <div class="preview-title">
+                <span>📝</span> Preview Window
+            </div>
+            <button class="preview-pin-btn" id="previewPinBtn" onclick="togglePinPreview()" title="পিন করুন">
+                📌
+            </button>
+        </div>
+        <div class="preview-body">
+            <!-- Typed Word / Root in Bold (Image 2) -->
+            <div class="preview-query" id="previewQuery">sOnar</div>
+            <!-- Suggestions List (Image 2) -->
+            <ul class="preview-suggestions" id="previewList">
+                <li class="preview-item selected" onclick="chooseSuggestion('সোনার')">
+                    <span>সোনার</span>
+                    <span class="item-num">1</span>
+                </li>
+                <li class="preview-item" onclick="chooseSuggestion('সনার')">
+                    <span>সনার</span>
+                    <span class="item-num">2</span>
+                </li>
+                <li class="preview-item" onclick="chooseSuggestion('শোনার')">
+                    <span>শোনার</span>
+                    <span class="item-num">3</span>
+                </li>
+                <li class="preview-item" onclick="chooseSuggestion('শোণার')">
+                    <span>শোণার</span>
+                    <span class="item-num">4</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ========================================================================
+         MAIN BODY & SCRATCHPAD
+         ======================================================================== -->
+    <div class="container">
+        <!-- Live Scratchpad Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>✍️ বাংলা টাইপিং স্ক্র্যাচপ্যাড</span>
+                    <span id="activeLayoutBadge" style="font-size: 11px; background: rgba(0,210,122,0.15); color: var(--accent-green); padding: 3px 8px; border-radius: 4px;">English</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted);">
+                    হটকি: <b>F12</b> (টগল), <b>Ctrl+Alt+V</b> (বিজয়), <b>Ctrl+Alt+B</b> (ক্লাসিক), <b>Ctrl+Alt+E</b> (ইংরেজি)
+                </div>
+            </div>
+
+            <textarea id="liveScratchpad" class="scratchpad" placeholder="এখানে টাইপ করুন (সরাসরি প্রিভিউ উইন্ডোতে সদৃশ শব্দ দেখা যাবে)..."></textarea>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
+                <div style="font-size: 13px; color: var(--text-muted);">
+                    অক্ষর: <span id="charCount" style="color: var(--accent-gold); font-weight: 700;">0</span> | 
+                    শব্দ: <span id="wordCount" style="color: var(--accent-green); font-weight: 700;">0</span>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn" onclick="clearScratchpad()">মুছুন</button>
+                    <button class="btn primary" onclick="copyScratchpad()">📋 কপি করুন</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4-Corner BDS 1738 Virtual Keyboard (Toggled via Keyboard Button) -->
+        <div class="virtual-keyboard-section" id="virtualKeyboardSection">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                <div style="font-weight: 700; font-size: 14px;">জাতীয় প্রমিত বাংলা কীবোর্ড (বিজয় চতুর্থ সংস্করণ ২০২৪ / BDS 1738)</div>
+                <div style="font-size: 11px; color: var(--text-muted);">
+                    <span style="color: #38BDF8;">● স্বাভাবিক</span> | 
+                    <span style="color: #F43F5E;">● শিফট</span> | 
+                    <span style="color: var(--accent-green);">● লিঙ্ক (g+Key)</span>
+                </div>
+            </div>
+            <div id="virtualKeyboardContainer"></div>
+        </div>
+    </div>
+
+    <!-- ========================================================================
+         3. AVRO ⇄ 36JULY (BIJOY) CONVERTER MODAL
+         ======================================================================== -->
+    <div class="modal-overlay" id="converterModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 style="font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                    <span>🌐</span> অভ্র ⇄ ৩৬জুলাই (বিজয়) টেক্সট কনভার্টার
+                </h2>
+                <button class="btn" onclick="closeConverterModal()">✕ বন্ধ করুন</button>
+            </div>
+
+            <div class="converter-columns">
+                <div>
+                    <div style="font-size: 13px; font-weight: 600; color: #38BDF8; margin-bottom: 6px; display: flex; justify-content: space-between;">
+                        <span>অভ্র / ইউনিকোড টেক্সট</span>
+                        <button class="btn" style="padding: 2px 6px; font-size: 11px;" onclick="loadAvroSample()">নমুনা</button>
+                    </div>
+                    <textarea id="convAvroInput" class="conv-textarea" placeholder="এখানে অভ্র বা ইউনিকোড বাংলা লিখুন (যেমন: আমার সোনার বাংলা)..."></textarea>
+                </div>
+
+                <div>
+                    <div style="font-size: 13px; font-weight: 600; color: var(--accent-gold); margin-bottom: 6px; display: flex; justify-content: space-between;">
+                        <span>৩৬জুলাই / বিজয় ক্লাসিক (SutonnyMJ)</span>
+                        <button class="btn" style="padding: 2px 6px; font-size: 11px;" onclick="loadBijoySample()">নমুনা</button>
+                    </div>
+                    <textarea id="convBijoyOutput" class="conv-textarea" placeholder="এখানে বিজয় সুতন্বীএমজে টেক্সট আসবে (যেমন: Avgvi †mvbvi evsjv)..."></textarea>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn" onclick="swapConverterText()">⇄ অদলবদল</button>
+                <button class="btn primary" onclick="runAvroToBijoy()">অভ্র থেকে ৩৬জুলাই (বিজয়) ➔</button>
+                <button class="btn primary" onclick="runBijoyToAvro()">➔ ৩৬জুলাই থেকে অভ্র (ইউনিকোড)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================
+         4. HELP & TUTORIAL MODAL
+         ======================================================================== -->
+    <div class="modal-overlay" id="helpModal">
+        <div class="modal" style="max-height: 80vh; overflow-y: auto;">
+            <div class="modal-header">
+                <h2>📖 বিজয় ৩৬জুলাই টাইপিং নির্দেশিকা</h2>
+                <button class="btn" onclick="closeHelpModal()">✕</button>
+            </div>
+            <div style="line-height: 1.7; font-size: 14px; color: #E2E8F0;">
+                <p><b>স্বরবর্ণ গঠন:</b> `F`=অ, `gf`=আ, `gd`=ই, `gD`=ঈ, `gs`=উ, `ga`=ঋ, `gc`=এ, `gC`=ঐ, `x`=ও, `gX`=ঔ।</p>
+                <p><b>প্রি-কার টাইপিং:</b> `d`+`k` = <b>তি</b>, `c`+`k` = <b>তে</b>।</p>
+                <p><b>ও-কার ও ঔ-কার:</b> `c` + বর্ণ + `f` = <b>তো</b>, `c` + বর্ণ + `X` = <b>তৌ</b>।</p>
+                <p><b>যুক্তাক্ষর (হসন্ত g দিয়ে):</b> `jgk`=ক্ত, `jgN`=ক্ষ, `ugI`=জ্ঞ, `Igy`=ঞ্চ, `igm`=হ্ম, `hzigmB`=ব্রাহ্মণ।</p>
+                <p><b>রেফ ও ফলা:</b> `A`+বর্ণ = র্ক, `j`+`z` = ক্র (র-ফলা), `j`+`Z` = ক্য (য-ফলা)।</p>
+                <p><b>২০২৪ মুদ্রা ও অসমীয়া বর্ণ:</b> `g1`–`g8`=আনা/গণ্ডা, `g,`=ৰ, `g.`=ৱ, `g#`=ঽ, `gG`=॥, `Shift+4`=৳।</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">লেখা ক্লিপবোর্ডে কপি হয়েছে!</div>
+
+    <script>
+        let currentLayout = "English";
+        let isPreviewPinned = false;
+        let typedBuffer = "";
+
+        // Keyboard layout data matching PDF page 2
+        const KB_ROWS = [
+            [
+                { char: '`', shift: '~', tl: '', tr: '“', bl: '', br: '‘', center: '`' },
+                { char: '1', shift: '!', tl: '৴', tr: '!', bl: '', br: '১', center: '1' },
+                { char: '2', shift: '@', tl: '৵', tr: '@', bl: '', br: '২', center: '2' },
+                { char: '3', shift: '#', tl: '৶', tr: 'ঽ', bl: '', br: '৩', center: '3' },
+                { char: '4', shift: '$', tl: '৷', tr: '৳', bl: '', br: '৪', center: '4' },
+                { char: '5', shift: '%', tl: '৸', tr: '%', bl: '', br: '৫', center: '5' },
+                { char: '6', shift: '^', tl: '৹', tr: '^', bl: '', br: '৬', center: '6' },
+                { char: '7', shift: '&', tl: '৺', tr: 'ঁ', bl: '', br: '৭', center: '7' },
+                { char: '8', shift: '*', tl: '৲', tr: '*', bl: '', br: '৮', center: '8' },
+                { char: '9', shift: '(', tl: '', tr: '(', bl: '', br: '৯', center: '9' },
+                { char: '0', shift: ')', tl: '', tr: ')', bl: '', br: '০', center: '0' },
+                { char: '-', shift: '_', tl: '৻', tr: '_', bl: '', br: '-', center: '-' },
+                { char: '=', shift: '+', tl: '', tr: '+', bl: '', br: '=', center: '=' },
+                { name: 'Backspace', class: 'backspace' }
+            ],
+            [
+                { name: 'Tab', class: 'tab' },
+                { char: 'q', shift: 'Q', tl: '', tr: 'ং', bl: '', br: 'ঙ', center: 'Q' },
+                { char: 'w', shift: 'W', tl: '', tr: 'য়', bl: '', br: 'য', center: 'W' },
+                { char: 'e', shift: 'E', tl: '', tr: 'ঢ', bl: '', br: 'ড', center: 'E' },
+                { char: 'r', shift: 'R', tl: '', tr: 'ফ', bl: '', br: 'প', center: 'R' },
+                { char: 't', shift: 'T', tl: '', tr: 'ঠ', bl: '', br: 'ট', center: 'T' },
+                { char: 'y', shift: 'Y', tl: '', tr: 'ছ', bl: '', br: 'চ', center: 'Y' },
+                { char: 'u', shift: 'U', tl: '', tr: 'ঝ', bl: '', br: 'জ', center: 'U' },
+                { char: 'i', shift: 'I', tl: '', tr: 'ঞ', bl: '', br: 'হ', center: 'I' },
+                { char: 'o', shift: 'O', tl: '', tr: 'ঘ', bl: '', br: 'গ', center: 'O' },
+                { char: 'p', shift: 'P', tl: '', tr: 'ঢ়', bl: '', br: 'ড়', center: 'P' },
+                { char: '[', shift: '{', tl: '', tr: '{', bl: '', br: '[', center: '[' },
+                { char: ']', shift: '}', tl: '', tr: '}', bl: '', br: ']', center: ']' },
+                { char: '\\', shift: '|', tl: '', tr: 'ঃ', bl: '', br: 'ৎ', center: '\\' }
+            ],
+            [
+                { name: 'Caps Lock', class: 'caps' },
+                { char: 'a', shift: 'A', tl: 'ঋ', tr: 'র্', bl: '', br: 'ৃ', center: 'A' },
+                { char: 's', shift: 'S', tl: 'উ', tr: 'ূ', bl: '', br: 'ু', center: 'S' },
+                { char: 'd', shift: 'D', tl: 'ই', tr: 'ী', bl: '', br: 'ি', center: 'D' },
+                { char: 'f', shift: 'F', tl: 'আ', tr: 'অ', bl: '', br: 'া', center: 'F' },
+                { char: 'g', shift: 'G', tl: '॥', tr: '।', bl: '', br: '্', center: 'G' },
+                { char: 'h', shift: 'H', tl: '', tr: 'ভ', bl: '', br: 'ব', center: 'H' },
+                { char: 'j', shift: 'J', tl: '', tr: 'খ', bl: '', br: 'ক', center: 'J' },
+                { char: 'k', shift: 'K', tl: '', tr: 'থ', bl: '', br: 'ত', center: 'K' },
+                { char: 'l', shift: 'L', tl: '', tr: 'ধ', bl: '', br: 'দ', center: 'L' },
+                { char: ';', shift: ':', tl: '', tr: ':', bl: '', br: ';', center: ';' },
+                { char: '\'', shift: '"', tl: '', tr: '"', bl: '', br: '\'', center: '\'' },
+                { name: 'Enter', class: 'enter' }
+            ],
+            [
+                { name: 'Shift', class: 'shift-l' },
+                { char: 'z', shift: 'Z', tl: '', tr: '্য', bl: '', br: '্র', center: 'Z' },
+                { char: 'x', shift: 'X', tl: 'ঔ', tr: 'ৌ', bl: '', br: 'ও', center: 'X' },
+                { char: 'c', shift: 'C', tl: 'এ', tr: 'ৈ', bl: '', br: 'ে', center: 'C' },
+                { char: 'v', shift: 'V', tl: '', tr: 'ল', bl: '', br: 'র', center: 'V' },
+                { char: 'b', shift: 'B', tl: '', tr: 'ণ', bl: '', br: 'ন', center: 'B' },
+                { char: 'n', shift: 'N', tl: '', tr: 'ষ', bl: '', br: 'স', center: 'N' },
+                { char: 'm', shift: 'M', tl: '', tr: 'শ', bl: '', br: 'ম', center: 'M' },
+                { char: ',', shift: '<', tl: 'ৰ', tr: '<', bl: '', br: ',', center: ',' },
+                { char: '.', shift: '>', tl: 'ৱ', tr: '>', bl: '', br: '.', center: '.' },
+                { char: '/', shift: '?', tl: '', tr: '?', bl: '', br: '/', center: '/' },
+                { name: 'Shift', class: 'shift-r' }
+            ],
+            [
+                { name: 'Ctrl', class: 'mod' },
+                { name: 'Win', class: 'mod' },
+                { name: 'Alt', class: 'mod' },
+                { name: 'Spacebar (Space)', class: 'space', char: ' ' },
+                { name: 'Alt', class: 'mod' },
+                { name: 'Win', class: 'mod' },
+                { name: 'Ctrl', class: 'mod' }
+            ]
+        ];
+
+        function renderVirtualKeyboard() {
+            const kbContainer = document.getElementById('virtualKeyboardContainer');
+            kbContainer.innerHTML = '';
+
+            KB_ROWS.forEach(row => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'kb-row';
+
+                row.forEach(k => {
+                    const keyDiv = document.createElement('div');
+                    keyDiv.className = `key ${k.class || ''}`;
+                    if (k.char) keyDiv.dataset.char = k.char;
+
+                    if (k.name) {
+                        keyDiv.innerText = k.name;
+                    } else {
+                        keyDiv.innerHTML = `
+                            <span class="corner-tl">${k.tl || ''}</span>
+                            <span class="corner-tr">${k.tr || ''}</span>
+                            <span class="corner-center">${k.center || ''}</span>
+                            <span class="corner-bl">${k.bl || ''}</span>
+                            <span class="corner-br">${k.br || ''}</span>
+                        `;
+                    }
+
+                    keyDiv.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        if (k.name === 'Backspace') {
+                            const start = scratchpad.selectionStart;
+                            const end = scratchpad.selectionEnd;
+                            let val = scratchpad.value;
+                            if (start === end && start > 0) {
+                                scratchpad.value = val.slice(0, start - 1) + val.slice(start);
+                                scratchpad.setSelectionRange(start - 1, start - 1);
+                            } else if (start !== end) {
+                                scratchpad.value = val.slice(0, start) + val.slice(end);
+                                scratchpad.setSelectionRange(start, start);
+                            }
+                            scratchpad.focus();
+                            updateCounters();
+                            updatePreviewSuggestions(getCurrentWord(scratchpad.value, scratchpad.selectionStart));
+                        } else if (k.char === ' ') {
+                            insertTextAtCursor(' ');
+                        } else if (k.br) {
+                            insertTextAtCursor(k.br);
+                        } else if (k.char) {
+                            insertTextAtCursor(k.char);
+                        }
+                    });
+
+                    rowDiv.appendChild(keyDiv);
+                });
+
+                kbContainer.appendChild(rowDiv);
+            });
+        }
+
+        function insertTextAtCursor(text) {
+            const start = scratchpad.selectionStart;
+            const end = scratchpad.selectionEnd;
+            const val = scratchpad.value;
+            scratchpad.value = val.slice(0, start) + text + val.slice(end);
+            const newPos = start + text.length;
+            scratchpad.setSelectionRange(newPos, newPos);
+            scratchpad.focus();
+            updateCounters();
+            updatePreviewSuggestions(getCurrentWord(scratchpad.value, newPos));
+        }
+
+        // Dropdown toggle
+        function toggleLayoutMenu() {
+            const menu = document.getElementById('layoutDropdownMenu');
+            menu.classList.toggle('show');
+        }
+
+        window.addEventListener('click', (e) => {
+            if (!e.target.closest('.layout-dropdown') && !e.target.closest('.bar-logo')) {
+                document.getElementById('layoutDropdownMenu').classList.remove('show');
+            }
+        });
+
+        function selectLayout(layout) {
+            currentLayout = layout;
+            let label = "English";
+            if (layout === "Unicode") label = "বিজয় ৩৬জুলাই";
+            if (layout === "Classic") label = "বিজয় ক্লাসিক";
+            if (layout === "Avro") label = "অভ্র ফোনেটিক";
+
+            document.getElementById('layoutNameText').innerText = label;
+            document.getElementById('activeLayoutBadge').innerText = label;
+
+            // Sync with backend
+            fetch('/api/mode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: layout })
+            });
+
+            document.querySelectorAll('.dropdown-item').forEach(item => {
+                if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(layout)) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+            document.getElementById('layoutDropdownMenu').classList.remove('show');
+        }
+
+        function toggleVirtualKeyboard() {
+            const section = document.getElementById('virtualKeyboardSection');
+            const btn = document.getElementById('btnToggleKeyboard');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                btn.classList.add('active');
+            } else {
+                section.style.display = 'none';
+                btn.classList.remove('active');
+            }
+        }
+
+        function togglePreviewWindow() {
+            const pw = document.getElementById('previewWindow');
+            pw.style.display = (pw.style.display === 'none') ? 'block' : 'none';
+        }
+
+        function togglePinPreview() {
+            isPreviewPinned = !isPreviewPinned;
+            const btn = document.getElementById('previewPinBtn');
+            btn.classList.toggle('pinned', isPreviewPinned);
+        }
+
+        // Live typing in scratchpad & word suggestion logic
+        const scratchpad = document.getElementById('liveScratchpad');
+
+        // Global shortcuts & suggestion selection inside scratchpad
+        scratchpad.addEventListener('keydown', (e) => {
+            // Global layout switching shortcuts
+            if (e.ctrlKey && e.altKey) {
+                if (e.key === 'v' || e.key === 'V') { selectLayout('Unicode'); e.preventDefault(); return; }
+                if (e.key === 'b' || e.key === 'B') { selectLayout('Classic'); e.preventDefault(); return; }
+                if (e.key === 'e' || e.key === 'E') { selectLayout('English'); e.preventDefault(); return; }
+            }
+            if (e.key === 'F12') {
+                const next = currentLayout === 'English' ? 'Unicode' : 'English';
+                selectLayout(next);
+                e.preventDefault();
+                return;
+            }
+
+            // Alt + 1..4 to choose candidate suggestion from Preview Window (Image 2)
+            if (['1', '2', '3', '4'].includes(e.key) && e.altKey) {
+                const idx = parseInt(e.key) - 1;
+                const items = document.querySelectorAll('.preview-item');
+                if (items[idx]) {
+                    items[idx].click();
+                    e.preventDefault();
+                    return;
+                }
+            }
+        });
+
+        // Real-time updates without interfering with typing
+        scratchpad.addEventListener('input', () => {
+            updateCounters();
+            const val = scratchpad.value;
+            const pos = scratchpad.selectionStart;
+            const currentWord = getCurrentWord(val, pos);
+            updatePreviewSuggestions(currentWord);
+        });
+
+        scratchpad.addEventListener('click', () => {
+            const val = scratchpad.value;
+            const pos = scratchpad.selectionStart;
+            const currentWord = getCurrentWord(val, pos);
+            updatePreviewSuggestions(currentWord);
+        });
+
+        scratchpad.addEventListener('keyup', (e) => {
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+                const val = scratchpad.value;
+                const pos = scratchpad.selectionStart;
+                const currentWord = getCurrentWord(val, pos);
+                updatePreviewSuggestions(currentWord);
+            }
+        });
+
+        function getCurrentWord(text, cursorPos) {
+            const before = text.slice(0, cursorPos);
+            const match = before.match(/[\S]+$/);
+            return match ? match[0] : "";
+        }
+
+        // Fetch suggestions and populate Preview Window (Image 2)
+        function updatePreviewSuggestions(word) {
+            const queryDiv = document.getElementById('previewQuery');
+            const listDiv = document.getElementById('previewList');
+
+            if (!word || word.trim().length === 0) {
+                queryDiv.innerText = "sOnar";
+                return;
+            }
+
+            queryDiv.innerText = word;
+
+            fetch('/api/suggestions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: word, direction: '' })
+            })
+            .then(res => res.json())
+            .then(suggestions => {
+                listDiv.innerHTML = '';
+                if (!suggestions || suggestions.length === 0) {
+                    // Default fallback similar words
+                    suggestions = [word + "র", word + "ের", word + "টি", word + "গুলো"];
+                }
+                suggestions.slice(0, 4).forEach((sug, i) => {
+                    const li = document.createElement('li');
+                    li.className = `preview-item ${i === 0 ? 'selected' : ''}`;
+                    li.innerHTML = `<span>${sug}</span><span class="item-num">${i + 1}</span>`;
+                    li.onclick = () => chooseSuggestion(sug);
+                    listDiv.appendChild(li);
+                });
+            })
+            .catch(() => {});
+        }
+
+        function chooseSuggestion(sug) {
+            const val = scratchpad.value;
+            const pos = scratchpad.selectionStart;
+            const before = val.slice(0, pos);
+            const after = val.slice(pos);
+            const wordMatch = before.match(/[\S]+$/);
+
+            if (wordMatch) {
+                const start = before.length - wordMatch[0].length;
+                scratchpad.value = before.slice(0, start) + sug + " " + after;
+                const newPos = start + sug.length + 1;
+                scratchpad.setSelectionRange(newPos, newPos);
+            } else {
+                scratchpad.value += sug + " ";
+            }
+
+            typedBuffer = "";
+            scratchpad.focus();
+            updateCounters();
+        }
+
+        function updateCounters() {
+            const val = scratchpad.value;
+            document.getElementById('charCount').innerText = val.length;
+            const words = val.trim() ? val.trim().split(/\s+/).length : 0;
+            document.getElementById('wordCount').innerText = words;
+        }
+
+        function clearScratchpad() {
+            scratchpad.value = '';
+            typedBuffer = '';
+            fetch('/api/reset', { method: 'POST' });
+            updateCounters();
+        }
+
+        function copyScratchpad() {
+            navigator.clipboard.writeText(scratchpad.value);
+            showToast("লেখা ক্লিপবোর্ডে কপি করা হয়েছে!");
+        }
+
+        // Converter Modal functions
+        function openConverterModal() { document.getElementById('converterModal').classList.add('show'); }
+        function closeConverterModal() { document.getElementById('converterModal').classList.remove('show'); }
+
+        function runAvroToBijoy() {
+            const text = document.getElementById('convAvroInput').value;
+            fetch('/api/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, direction: 'avro_to_36july' })
+            })
+            .then(res => res.json())
+            .then(data => { document.getElementById('convBijoyOutput').value = data.result; });
+        }
+
+        function runBijoyToAvro() {
+            const text = document.getElementById('convBijoyOutput').value;
+            fetch('/api/convert', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, direction: '36july_to_avro' })
+            })
+            .then(res => res.json())
+            .then(data => { document.getElementById('convAvroInput').value = data.result; });
+        }
+
+        function swapConverterText() {
+            const a = document.getElementById('convAvroInput').value;
+            const b = document.getElementById('convBijoyOutput').value;
+            document.getElementById('convAvroInput').value = b;
+            document.getElementById('convBijoyOutput').value = a;
+        }
+
+        function loadAvroSample() {
+            document.getElementById('convAvroInput').value = "আমার সোনার বাংলা, আমি তোমায় ভালোবাসি। চিরদিন তোমার আকাশ, তোমার বাতাস, আমার প্রাণে বাজায় বাঁশি।";
+            runAvroToBijoy();
+        }
+
+        function loadBijoySample() {
+            document.getElementById('convBijoyOutput').value = "wWwRUvj evsjv‡`k ej‡Z Avgiv GK ev‡K¨ ewj ÒGKzk kZ‡Ki †mvbvi evsjvÓ|";
+            runBijoyToAvro();
+        }
+
+        // Modals
+        function openHelpModal() { document.getElementById('helpModal').classList.add('show'); }
+        function closeHelpModal() { document.getElementById('helpModal').classList.remove('show'); }
+        function openSettingsModal() { showToast("সেটিংস সক্রিয়: কীবোর্ড হুক ও অটো-স্টার্ট চালু আছে"); }
+        function openInfoModal() { showToast("বিজয় ৩৬জুলাই বাংলা কীবোর্ড v1.0.0 (BDS 1738)"); }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2200);
+        }
+
+        // Draggable Preview Window
+        const pw = document.getElementById('previewWindow');
+        const handle = document.getElementById('previewDragHandle');
+        let isDragging = false, offsetX, offsetY;
+
+        handle.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            offsetX = e.clientX - pw.offsetLeft;
+            offsetY = e.clientY - pw.offsetTop;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                pw.style.left = (e.clientX - offsetX) + 'px';
+                pw.style.top = (e.clientY - offsetY) + 'px';
+                pw.style.right = 'auto';
+            }
+        });
+
+        document.addEventListener('mouseup', () => { isDragging = false; });
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            renderVirtualKeyboard();
+            fetch('/api/status')
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.mode) {
+                        selectLayout(data.mode);
+                    }
+                })
+                .catch(() => {});
+        });
+    </script>
+</body>
+</html>

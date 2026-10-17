@@ -1,0 +1,9 @@
+[package]
+name = "bijoy-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bijoy-core = { path = "../bijoy-core" }
+bijoy-driver-win = { path = "../bijoy-driver-win" }
+bijoy-driver-linux = { path = "../bijoy-driver-linux" }

@@ -1,0 +1,7 @@
+[package]
+name = "bijoy-driver-win"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bijoy-core = { path = "../bijoy-core" }

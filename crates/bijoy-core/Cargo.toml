@@ -1,0 +1,8 @@
+[package]
+name = "bijoy-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Bijoy Bangla Team"]
+description = "Pure Rust core layout, IME state machine, and converter for Bijoy Bangla keyboard"
+
+[dependencies]

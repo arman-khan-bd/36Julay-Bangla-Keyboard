@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "crates/bijoy-core",
+    "crates/bijoy-driver-win",
+    "crates/bijoy-driver-linux",
+    "crates/bijoy-cli",
+    "crates/bijoy-app",
+]
+default-members = ["crates/bijoy-app"]
+resolver = "2"

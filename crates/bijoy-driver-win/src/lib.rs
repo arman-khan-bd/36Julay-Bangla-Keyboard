@@ -163,6 +163,26 @@ pub fn get_preview_info() -> Option<(String, Vec<String>)> {
     None
 }
 
+pub fn reset_engine() {
+    let mut lock = ENGINE.lock().unwrap();
+    if let Some(engine) = lock.as_mut() {
+        engine.reset();
+    }
+}
+
+pub fn select_suggestion(index: usize) -> bool {
+    let mut lock = ENGINE.lock().unwrap();
+    if let Some(engine) = lock.as_mut() {
+        if let Some((del, text)) = engine.select_suggestion(index) {
+            unsafe {
+                inject_output(del, &text);
+            }
+            return true;
+        }
+    }
+    false
+}
+
 pub fn is_hook_running() -> bool {
     IS_RUNNING.load(Ordering::SeqCst)
 }

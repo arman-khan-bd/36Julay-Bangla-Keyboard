@@ -212,4 +212,57 @@ mod tests {
         assert_eq!(type_string(&mut engine, "sonar "), "সোনার ");
         assert_eq!(type_string(&mut engine, "bangla "), "বাংলা ");
     }
+
+    #[test]
+    fn test_preview_and_space_hide() {
+        let mut engine = BijoyEngine::new();
+        engine.set_mode(BijoyMode::Avro);
+
+        // When user types letters in Avro:
+        engine.process_char('s');
+        engine.process_char('o');
+        engine.process_char('n');
+        engine.process_char('a');
+        engine.process_char('r');
+
+        let (query, sugs) = engine.get_preview_info();
+        assert_eq!(query, "sonar");
+        assert!(!sugs.is_empty());
+        assert_eq!(sugs[0], "সোনার");
+
+        // When space is pressed: word is committed and preview buffer is cleared!
+        let out = engine.process_char(' ');
+        assert_eq!(out.insert_text, "সোনার ");
+        let (query_after_space, sugs_after_space) = engine.get_preview_info();
+        assert!(query_after_space.is_empty());
+        assert!(sugs_after_space.is_empty());
+
+        // In Unicode mode:
+        engine.set_mode(BijoyMode::Unicode);
+        engine.process_char('g');
+        engine.process_char('f'); // আ
+        engine.process_char('m'); // ম
+        engine.process_char('f'); // া
+        let (q_uni, s_uni) = engine.get_preview_info();
+        assert_eq!(q_uni, "আমা");
+        assert!(!s_uni.is_empty());
+
+        // Space clears Unicode word buffer:
+        engine.process_char(' ');
+        let (q_after, _) = engine.get_preview_info();
+        assert!(q_after.is_empty());
+    }
+
+    #[test]
+    fn test_select_suggestion() {
+        let mut engine = BijoyEngine::new();
+        engine.set_mode(BijoyMode::Avro);
+        for c in "sonar".chars() {
+            engine.process_char(c);
+        }
+        let sel = engine.select_suggestion(0);
+        assert_eq!(sel, Some((5, "সোনার ".to_string())));
+        let (q, _) = engine.get_preview_info();
+        assert!(q.is_empty());
+    }
 }

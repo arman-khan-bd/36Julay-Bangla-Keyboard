@@ -25,6 +25,37 @@ static CURRENT_MODE_CACHED: Mutex<BijoyMode> = Mutex::new(BijoyMode::Unicode);
 static PREVIEW_QUERY: Mutex<String> = Mutex::new(String::new());
 static PREVIEW_SUGGESTIONS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static PREVIEW_PINNED: AtomicBool = AtomicBool::new(false);
+static MOUSE_WAS_DOWN: AtomicBool = AtomicBool::new(false);
+
+/// Helper to create high-quality Bengali font with Kalpurush (installed on Windows)
+pub unsafe fn create_bengali_font(height: i32, weight: i32) -> HFONT {
+    CreateFontW(
+        height, 0, 0, 0, weight, 0, 0, 0,
+        1, // DEFAULT_CHARSET
+        0, // OUT_DEFAULT_PRECIS
+        0, // CLIP_DEFAULT_PRECIS
+        5, // CLEARTYPE_QUALITY
+        0, // DEFAULT_PITCH
+        to_wide_str("Kalpurush").as_ptr(),
+    )
+}
+
+unsafe fn hide_preview_if_not_pinned() {
+    let mut q_lock = PREVIEW_QUERY.lock().unwrap();
+    let mut s_lock = PREVIEW_SUGGESTIONS.lock().unwrap();
+    if !q_lock.is_empty() {
+        q_lock.clear();
+        s_lock.clear();
+        if let Some(prev_hwnd) = *PREVIEW_HWND.lock().unwrap() {
+            InvalidateRect(prev_hwnd.0, std::ptr::null(), 1);
+        }
+    }
+    if let Some(prev_hwnd) = *PREVIEW_HWND.lock().unwrap() {
+        if IsWindowVisible(prev_hwnd.0) != 0 && !PREVIEW_PINNED.load(std::sync::atomic::Ordering::SeqCst) {
+            ShowWindow(prev_hwnd.0, SW_HIDE);
+        }
+    }
+}
 
 const TRAY_ICON_ID: u32 = 1001;
 const WM_TRAYICON: u32 = WM_USER + 101;
@@ -55,14 +86,9 @@ pub fn run_native_gui() {
     unsafe {
         let h_instance = GetModuleHandleW(std::ptr::null());
 
-        // Default query and suggestions (Image 2 sample: sOnar -> সোনার, সনার, শোনার, শোণার)
-        *PREVIEW_QUERY.lock().unwrap() = "sOnar".to_string();
-        *PREVIEW_SUGGESTIONS.lock().unwrap() = vec![
-            "সোনার".to_string(),
-            "সনার".to_string(),
-            "শোনার".to_string(),
-            "শোণার".to_string(),
-        ];
+        // Default query and suggestions start empty
+        *PREVIEW_QUERY.lock().unwrap() = String::new();
+        *PREVIEW_SUGGESTIONS.lock().unwrap() = Vec::new();
 
         // 1. Register Window Classes
         register_classes(h_instance);
@@ -71,15 +97,15 @@ pub fn run_native_gui() {
         let top_bar = create_top_bar_window(h_instance);
         *TOP_BAR_HWND.lock().unwrap() = Some(SafeHwnd(top_bar));
 
-        // 3. Create Preview Window (Image 2)
+        // 3. Create Preview Window (Image 2 - starts hidden until typing starts)
         let preview_win = create_preview_window(h_instance);
         *PREVIEW_HWND.lock().unwrap() = Some(SafeHwnd(preview_win));
 
         // 4. Create System Tray Icon
         setup_tray_icon(top_bar, h_instance);
 
-        // 5. Start a periodic timer to synchronize mode from keyboard hook
-        SetTimer(top_bar, TIMER_SYNC_ID, 150, None);
+        // 5. Start a periodic 30ms timer to synchronize mode and auto show/hide preview
+        SetTimer(top_bar, TIMER_SYNC_ID, 30, None);
 
         println!("✓ Native Windows Top Bar (Image 1) & Preview Window (Image 2) active!");
         println!("  Press Ctrl+Alt+V (Unicode), Ctrl+Alt+B (Classic), F12 (Avro), Ctrl+Alt+E (English)");
@@ -233,10 +259,7 @@ unsafe extern "system" fn top_bar_wnd_proc(
             SetBkMode(hdc, TRANSPARENT);
 
             // 1. Golden 'অ' Logo on Left (Image 1)
-            let font_logo = CreateFontW(
-                24, 0, 0, 0, 800, 0, 0, 0, 1, 0, 0, 5, 0,
-                to_wide_str("Vrinda").as_ptr(),
-            );
+            let font_logo = create_bengali_font(24, 800);
             let old_font = SelectObject(hdc, font_logo as *mut c_void);
             SetTextColor(hdc, rgb(246, 173, 85)); // Golden color
 
@@ -356,6 +379,7 @@ unsafe extern "system" fn top_bar_wnd_proc(
         }
         WM_TIMER => {
             if wparam == TIMER_SYNC_ID {
+                // 1. Sync keyboard layout mode
                 let actual_mode = bijoy_driver_win::get_current_mode();
                 let mut cached = CURRENT_MODE_CACHED.lock().unwrap();
                 if *cached != actual_mode {
@@ -363,16 +387,63 @@ unsafe extern "system" fn top_bar_wnd_proc(
                     InvalidateRect(hwnd, std::ptr::null(), 1);
                 }
 
-                if let Some((query, sugs)) = bijoy_driver_win::get_preview_info() {
-                    let mut q_lock = PREVIEW_QUERY.lock().unwrap();
-                    let mut s_lock = PREVIEW_SUGGESTIONS.lock().unwrap();
-                    if *q_lock != query {
-                        *q_lock = query;
-                        *s_lock = sugs;
-                        if let Some(prev_hwnd) = *PREVIEW_HWND.lock().unwrap() {
-                            InvalidateRect(prev_hwnd.0, std::ptr::null(), 1);
+                // 2. Click outside detection to auto-hide preview window
+                let lbtn = (GetAsyncKeyState(VK_LBUTTON) as u16 & 0x8000) != 0;
+                let rbtn = (GetAsyncKeyState(VK_RBUTTON) as u16 & 0x8000) != 0;
+                let mbtn = (GetAsyncKeyState(VK_MBUTTON) as u16 & 0x8000) != 0;
+                let mouse_down = lbtn || rbtn || mbtn;
+                let was_down = MOUSE_WAS_DOWN.swap(mouse_down, std::sync::atomic::Ordering::SeqCst);
+
+                if mouse_down && !was_down {
+                    if let Some(prev_h) = *PREVIEW_HWND.lock().unwrap() {
+                        let prev_hwnd = prev_h.0;
+                        if IsWindowVisible(prev_hwnd) != 0 && !PREVIEW_PINNED.load(std::sync::atomic::Ordering::SeqCst) {
+                            let mut pt: POINT = std::mem::zeroed();
+                            GetCursorPos(&mut pt);
+
+                            let mut rc_prev: RECT = std::mem::zeroed();
+                            GetWindowRect(prev_hwnd, &mut rc_prev);
+
+                            let mut rc_bar: RECT = std::mem::zeroed();
+                            GetWindowRect(hwnd, &mut rc_bar);
+
+                            let in_prev = pt_in_rect(&rc_prev, pt);
+                            let in_bar = pt_in_rect(&rc_bar, pt);
+
+                            if !in_prev && !in_bar {
+                                ShowWindow(prev_hwnd, SW_HIDE);
+                                PREVIEW_QUERY.lock().unwrap().clear();
+                                PREVIEW_SUGGESTIONS.lock().unwrap().clear();
+                                bijoy_driver_win::reset_engine();
+                            }
                         }
                     }
+                }
+
+                // 3. Real-time preview query & suggestion update
+                let info = bijoy_driver_win::get_preview_info();
+                if let Some((query, sugs)) = info {
+                    if !query.is_empty() {
+                        let mut q_lock = PREVIEW_QUERY.lock().unwrap();
+                        let mut s_lock = PREVIEW_SUGGESTIONS.lock().unwrap();
+                        let changed = *q_lock != query;
+                        if changed {
+                            *q_lock = query;
+                            *s_lock = sugs;
+                            if let Some(prev_hwnd) = *PREVIEW_HWND.lock().unwrap() {
+                                InvalidateRect(prev_hwnd.0, std::ptr::null(), 1);
+                            }
+                        }
+                        if let Some(prev_hwnd) = *PREVIEW_HWND.lock().unwrap() {
+                            if IsWindowVisible(prev_hwnd.0) == 0 {
+                                ShowWindow(prev_hwnd.0, SW_SHOWNA);
+                            }
+                        }
+                    } else {
+                        hide_preview_if_not_pinned();
+                    }
+                } else {
+                    hide_preview_if_not_pinned();
                 }
             }
             0
@@ -430,8 +501,8 @@ unsafe extern "system" fn top_bar_wnd_proc(
 // ============================================================================
 unsafe fn create_preview_window(h_instance: HINSTANCE) -> HWND {
     let screen_w = GetSystemMetrics(SM_CXSCREEN);
-    let win_w = 200;
-    let win_h = 165;
+    let win_w = 210;
+    let win_h = 168;
     let win_x = screen_w - win_w - 30;
     let win_y = 50;
 
@@ -439,10 +510,10 @@ unsafe fn create_preview_window(h_instance: HINSTANCE) -> HWND {
     let title = to_wide_str("Preview Window");
 
     let hwnd = CreateWindowExW(
-        WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         class_name.as_ptr(),
         title.as_ptr(),
-        WS_POPUP | WS_VISIBLE,
+        WS_POPUP,
         win_x,
         win_y,
         win_w,
@@ -453,8 +524,8 @@ unsafe fn create_preview_window(h_instance: HINSTANCE) -> HWND {
         std::ptr::null_mut(),
     );
 
-    ShowWindow(hwnd, SW_SHOW);
-    UpdateWindow(hwnd);
+    // Initially start hidden — appears automatically on typing anywhere!
+    ShowWindow(hwnd, SW_HIDE);
     hwnd
 }
 
@@ -487,7 +558,7 @@ unsafe extern "system" fn preview_wnd_proc(
             DrawTextW(hdc, t_text.as_ptr(), -1, &mut t_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
             let mut pin_rc = RECT { left: rc.right - 24, top: 0, right: rc.right - 4, bottom: 26 };
-            let pin_text = to_wide_str("📌");
+            let pin_text = to_wide_str(if PREVIEW_PINNED.load(std::sync::atomic::Ordering::SeqCst) { "📍" } else { "📌" });
             DrawTextW(hdc, pin_text.as_ptr(), -1, &mut pin_rc, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
             // 2. Query Row (Image 2: bold query on pale yellow background)
@@ -496,7 +567,7 @@ unsafe extern "system" fn preview_wnd_proc(
             FillRect(hdc, &query_rc, brush_query);
             DeleteObject(brush_query as *mut c_void);
 
-            let font_query = CreateFontW(18, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Segoe UI").as_ptr());
+            let font_query = CreateFontW(17, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Segoe UI").as_ptr());
             SelectObject(hdc, font_query as *mut c_void);
             SetTextColor(hdc, rgb(0, 0, 0));
 
@@ -506,9 +577,9 @@ unsafe extern "system" fn preview_wnd_proc(
             DrawTextW(hdc, q_w.as_ptr(), -1, &mut q_rc, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             DeleteObject(font_query as *mut c_void);
 
-            // 3. Suggestions List (Image 2: blue selection for 1st item, white for rest)
+            // 3. Suggestions List in Crisp Bengali Kalpurush font (No tofus/boxes!)
             let suggestions = PREVIEW_SUGGESTIONS.lock().unwrap().clone();
-            let font_sug = CreateFontW(17, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Vrinda").as_ptr());
+            let font_sug = create_bengali_font(18, 600);
             SelectObject(hdc, font_sug as *mut c_void);
 
             for (idx, sug) in suggestions.iter().take(4).enumerate() {
@@ -551,11 +622,23 @@ unsafe extern "system" fn preview_wnd_proc(
                     let pinned = PREVIEW_PINNED.fetch_xor(true, std::sync::atomic::Ordering::SeqCst);
                     let flag = if !pinned { HWND_TOPMOST } else { HWND_NOTOPMOST };
                     SetWindowPos(hwnd, flag, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+                    InvalidateRect(hwnd, std::ptr::null(), 1);
                     return 0;
                 }
                 // Drag preview window
                 ReleaseCapture();
                 SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION as WPARAM, 0);
+                return 0;
+            } else if y >= 58 {
+                let idx = ((y - 58) / 26) as usize;
+                let sugs = PREVIEW_SUGGESTIONS.lock().unwrap().clone();
+                if idx < sugs.len() {
+                    bijoy_driver_win::select_suggestion(idx);
+                    ShowWindow(hwnd, SW_HIDE);
+                    PREVIEW_QUERY.lock().unwrap().clear();
+                    PREVIEW_SUGGESTIONS.lock().unwrap().clear();
+                    return 0;
+                }
             }
             0
         }
@@ -607,7 +690,7 @@ pub fn show_converter_window() {
 }
 
 unsafe fn create_converter_controls(parent: HWND, h_instance: HINSTANCE) {
-    let font = CreateFontW(16, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Vrinda").as_ptr());
+    let font = create_bengali_font(16, 400);
     let font_btn = CreateFontW(14, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Segoe UI").as_ptr());
 
     // Top Edit Box (Avro / Unicode)
@@ -821,7 +904,7 @@ pub fn toggle_preview_window() {
             if IsWindowVisible(hwnd) != 0 {
                 ShowWindow(hwnd, SW_HIDE);
             } else {
-                ShowWindow(hwnd, SW_SHOW);
+                ShowWindow(hwnd, SW_SHOWNA);
                 SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
             }
         }
@@ -922,7 +1005,7 @@ unsafe extern "system" fn vk_wnd_proc(
             ];
 
             let font_eng = CreateFontW(11, 0, 0, 0, 600, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Segoe UI").as_ptr());
-            let font_bn = CreateFontW(16, 0, 0, 0, 700, 0, 0, 0, 1, 0, 0, 5, 0, to_wide_str("Vrinda").as_ptr());
+            let font_bn = create_bengali_font(16, 700);
             let brush_key = CreateSolidBrush(rgb(30, 41, 59));
             let brush_border = CreateSolidBrush(rgb(71, 85, 105));
 

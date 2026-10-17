@@ -35,6 +35,7 @@ pub const WS_EX_TOPMOST: u32 = 0x00000008;
 pub const WS_EX_TOOLWINDOW: u32 = 0x00000080;
 pub const WS_EX_LAYERED: u32 = 0x00080000;
 pub const WS_EX_CLIENTEDGE: u32 = 0x00000200;
+pub const WS_EX_NOACTIVATE: u32 = 0x08000000;
 
 pub const ES_MULTILINE: u32 = 0x0004;
 pub const ES_AUTOVSCROLL: u32 = 0x0040;
@@ -45,6 +46,14 @@ pub const BS_PUSHBUTTON: u32 = 0x0000;
 pub const SW_HIDE: i32 = 0;
 pub const SW_SHOWNORMAL: i32 = 1;
 pub const SW_SHOW: i32 = 5;
+pub const SW_SHOWNA: i32 = 8;
+
+pub const VK_LBUTTON: i32 = 0x01;
+pub const VK_RBUTTON: i32 = 0x02;
+pub const VK_MBUTTON: i32 = 0x04;
+pub const VK_SPACE: i32 = 0x20;
+pub const VK_RETURN: i32 = 0x0D;
+pub const VK_ESCAPE: i32 = 0x1B;
 
 pub const WM_DESTROY: u32 = 0x0002;
 pub const WM_PAINT: u32 = 0x000F;
@@ -225,6 +234,7 @@ extern "system" {
     pub fn LoadCursorW(hInstance: HINSTANCE, lpCursorName: *const u16) -> HCURSOR;
     pub fn SetCursor(hCursor: HCURSOR) -> HCURSOR;
     pub fn GetCursorPos(lpPoint: *mut POINT) -> i32;
+    pub fn GetAsyncKeyState(vKey: i32) -> i16;
     pub fn ReleaseCapture() -> i32;
     pub fn SendMessageW(hWnd: HWND, Msg: u32, wParam: WPARAM, lParam: LPARAM) -> LRESULT;
     pub fn PostMessageW(hWnd: HWND, Msg: u32, wParam: WPARAM, lParam: LPARAM) -> i32;
@@ -299,6 +309,11 @@ extern "system" {
 #[inline]
 pub fn rgb(r: u8, g: u8, b: u8) -> COLORREF {
     (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
+}
+
+#[inline]
+pub fn pt_in_rect(rc: &RECT, pt: POINT) -> bool {
+    pt.x >= rc.left && pt.x <= rc.right && pt.y >= rc.top && pt.y <= rc.bottom
 }
 
 pub fn to_wide_str(s: &str) -> Vec<u16> {

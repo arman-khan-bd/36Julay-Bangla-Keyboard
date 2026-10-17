@@ -65,6 +65,7 @@ pub struct BijoyEngine {
     consonant_just_typed: bool,
     last_sutonny_key: Option<char>,
     avro_buffer: String,
+    current_word: String,
 }
 
 impl Default for BijoyEngine {
@@ -85,6 +86,7 @@ impl BijoyEngine {
             consonant_just_typed: false,
             last_sutonny_key: None,
             avro_buffer: String::new(),
+            current_word: String::new(),
         }
     }
 
@@ -97,6 +99,7 @@ impl BijoyEngine {
         self.consonant_just_typed = false;
         self.last_sutonny_key = None;
         self.avro_buffer.clear();
+        self.current_word.clear();
     }
 
     pub fn set_mode(&mut self, mode: BijoyMode) {
@@ -112,13 +115,35 @@ impl BijoyEngine {
                 return (self.avro_buffer.clone(), sugs);
             }
         } else if self.mode == BijoyMode::Unicode {
-            if let Some(pre) = self.pending_pre_kar {
+            if !self.current_word.is_empty() {
+                let sugs = crate::dictionary::get_word_suggestions(&self.current_word, 5);
+                return (self.current_word.clone(), sugs);
+            } else if let Some(pre) = self.pending_pre_kar {
                 return (format!("+{}", pre), vec![format!("{}...", pre)]);
             } else if self.pending_link {
                 return ("্ (Link)".to_string(), vec!["যুক্তাক্ষর".to_string()]);
             }
         }
         (String::new(), Vec::new())
+    }
+
+    /// Select suggestion at index and return (delete_count, text_to_insert)
+    pub fn select_suggestion(&mut self, index: usize) -> Option<(usize, String)> {
+        let (_, sugs) = self.get_preview_info();
+        if index < sugs.len() {
+            let chosen = sugs[index].clone();
+            if self.mode == BijoyMode::Avro {
+                let del = self.avro_buffer.chars().count();
+                self.avro_buffer.clear();
+                return Some((del, format!("{} ", chosen)));
+            } else if self.mode == BijoyMode::Unicode {
+                let del = self.current_word.chars().count();
+                self.current_word.clear();
+                self.reset();
+                return Some((del, format!("{} ", chosen)));
+            }
+        }
+        None
     }
 
     /// Process a printable character key event.
@@ -133,16 +158,35 @@ impl BijoyEngine {
                 self.avro_buffer.pop();
                 return EngineOutput::pass_through();
             }
-            self.reset();
+            self.current_word.pop();
+            self.pending_pre_kar = None;
+            self.pending_link = false;
+            self.last_consonant_cluster.clear();
+            self.consonant_with_ekar = false;
+            self.consonant_just_typed = false;
             return EngineOutput::pass_through();
         }
 
-        match self.mode {
+        let out = match self.mode {
             BijoyMode::Unicode => self.process_unicode(ch),
             BijoyMode::Classic => self.process_classic(ch),
             BijoyMode::Avro => self.process_avro(ch),
             BijoyMode::English => EngineOutput::pass_through(),
+        };
+
+        if self.mode == BijoyMode::Unicode {
+            if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
+                self.current_word.clear();
+            } else {
+                for _ in 0..out.delete_count {
+                    self.current_word.pop();
+                }
+                if !out.insert_text.is_empty() {
+                    self.current_word.push_str(&out.insert_text);
+                }
+            }
         }
+        out
     }
 
     /// Avro phonetic real-time processing

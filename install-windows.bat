@@ -1,8 +1,8 @@
 @echo off
 chcp 65001 >nul
-title Bijoy 36July Bangla Keyboard Installer
+title July36 Bangla Keyboard Installer
 echo ============================================================
-echo     Bijoy 36July Bangla Keyboard Installer (Windows)
+echo         July36 Bangla Keyboard Installer (Windows)
 echo ============================================================
 echo.
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0install-windows.ps1"

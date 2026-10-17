@@ -104,6 +104,23 @@ impl BijoyEngine {
         self.reset();
     }
 
+    /// Retrieve live query string and candidate word suggestions for preview window
+    pub fn get_preview_info(&self) -> (String, Vec<String>) {
+        if self.mode == BijoyMode::Avro {
+            if !self.avro_buffer.is_empty() {
+                let sugs = crate::dictionary::get_word_suggestions(&self.avro_buffer, 5);
+                return (self.avro_buffer.clone(), sugs);
+            }
+        } else if self.mode == BijoyMode::Unicode {
+            if let Some(pre) = self.pending_pre_kar {
+                return (format!("+{}", pre), vec![format!("{}...", pre)]);
+            } else if self.pending_link {
+                return ("্ (Link)".to_string(), vec!["যুক্তাক্ষর".to_string()]);
+            }
+        }
+        (String::new(), Vec::new())
+    }
+
     /// Process a printable character key event.
     pub fn process_char(&mut self, ch: char) -> EngineOutput {
         if self.mode == BijoyMode::English {

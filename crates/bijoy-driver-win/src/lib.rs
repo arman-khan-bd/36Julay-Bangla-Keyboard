@@ -152,6 +152,17 @@ pub fn toggle_mode() {
     }
 }
 
+pub fn get_preview_info() -> Option<(String, Vec<String>)> {
+    let lock = ENGINE.lock().unwrap();
+    if let Some(engine) = lock.as_ref() {
+        let (q, sugs) = engine.get_preview_info();
+        if !q.is_empty() {
+            return Some((q, sugs));
+        }
+    }
+    None
+}
+
 pub fn is_hook_running() -> bool {
     IS_RUNNING.load(Ordering::SeqCst)
 }

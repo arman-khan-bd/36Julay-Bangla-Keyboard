@@ -1,7 +1,11 @@
 [package]
-name = "bijoy-app"
+name = "july36"
 version = "0.1.0"
 edition = "2021"
+
+[[bin]]
+name = "July36"
+path = "src/main.rs"
 
 [dependencies]
 bijoy-core = { path = "../bijoy-core" }

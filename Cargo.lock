@@ -3,15 +3,6 @@
 version = 4
 
 [[package]]
-name = "bijoy-app"
-version = "0.1.0"
-dependencies = [
- "bijoy-core",
- "bijoy-driver-linux",
- "bijoy-driver-win",
-]
-
-[[package]]
 name = "bijoy-cli"
 version = "0.1.0"
 dependencies = [
@@ -36,4 +27,13 @@ name = "bijoy-driver-win"
 version = "0.1.0"
 dependencies = [
  "bijoy-core",
+]
+
+[[package]]
+name = "july36"
+version = "0.1.0"
+dependencies = [
+ "bijoy-core",
+ "bijoy-driver-linux",
+ "bijoy-driver-win",
 ]

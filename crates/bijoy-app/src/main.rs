@@ -1,5 +1,12 @@
-//! Bijoy Bangla App: Desktop Control Center with Virtual Keyboard,
-//! System-Wide Keyboard Hook, Live Scratchpad, and Converter.
+//! July36: Native Windows Bangla Keyboard Software with Floating Top Bar,
+//! Floating Preview Window, Virtual Keyboard, Avro Converter, and System Hook.
+
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+#[cfg(target_os = "windows")]
+mod win32_api;
+#[cfg(target_os = "windows")]
+mod native_gui;
 
 use bijoy_core::{BijoyEngine, BijoyMode, LIGATURES};
 use std::io::{Read, Write};
@@ -11,12 +18,23 @@ const INDEX_HTML: &str = include_str!("../assets/index.html");
 const PORT: u16 = 8321;
 
 fn main() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        extern "system" {
+            fn AttachConsole(dwProcessId: u32) -> i32;
+        }
+        AttachConsole(0xFFFFFFFF); // Attach to parent terminal if launched from CMD/PowerShell
+    }
+
     println!("============================================================");
-    println!("        বিজয় বাংলা কীবোর্ড | Bijoy Bangla Keyboard");
+    println!("             July36 | জুলাই৩৬ বাংলা কীবোর্ড");
     println!("         Standard BDS 1738:2018 / 1935:2018 / 1520:2018");
     println!("============================================================");
 
-    // Initialize Windows system-wide hook
+    let args: Vec<String> = std::env::args().collect();
+    let web_mode = args.iter().any(|a| a == "--web");
+
+    // Initialize Windows system-wide hook & Native GUI
     #[cfg(target_os = "windows")]
     {
         println!("[Platform: Windows]");
@@ -25,7 +43,13 @@ fn main() {
             eprintln!("Warning: Could not start Windows hook: {}", e);
         } else {
             println!("✓ Windows system-wide hook active!");
-            println!("  Hotkeys: Ctrl+Alt+V (Unicode), Ctrl+Alt+B (Classic), Ctrl+Alt+E (English), F12 (Toggle)");
+            println!("  Hotkeys: Ctrl+Alt+V (Unicode), Ctrl+Alt+B (Classic), Ctrl+Alt+E (English), F12 (Avro)");
+        }
+
+        if !web_mode {
+            println!("Starting 100% Native Windows Desktop Software (Top Bar & Preview Window)...");
+            native_gui::run_native_gui();
+            return;
         }
     }
 
@@ -38,7 +62,7 @@ fn main() {
 
     let engine = Arc::new(Mutex::new(BijoyEngine::new()));
 
-    // Launch HTTP Server on 127.0.0.1:8321
+    // Launch HTTP Server on 127.0.0.1:8321 (fallback if --web specified)
     let addr = format!("127.0.0.1:{}", PORT);
     let listener = match TcpListener::bind(&addr) {
         Ok(l) => l,

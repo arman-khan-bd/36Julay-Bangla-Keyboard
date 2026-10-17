@@ -1,4 +1,4 @@
-# বিজয় বাংলা কীবোর্ড | Bijoy Bangla Keyboard in Rust
+# July36 | জুলাই৩৬ বাংলা কীবোর্ড (July36 Bangla Keyboard in Rust)
 ### BDS 1738:2018 / BDS 1935:2018 / BDS 1520:2018 Standard Implementation for Windows + Linux (All Distros)
 
 A ultra-fast, modern, memory-safe Bengali typing keyboard software written in **pure Rust**. Designed from the ground up according to the official **বিজয় নির্দেশিকা (Bijoy Bangla Typing Nirdeshika)** and Bangladesh national keyboard standards.
@@ -67,11 +67,14 @@ Bijoy36Julay/
 ### ১. ডেক্সটপ অ্যাপ ও সিস্টেম-ওয়াইড টাইপিং ড্রাইভার চালানো:
 ```bash
 cargo run -p bijoy-app
+# অথবা ইনস্টলার দিয়ে ইনস্টল করে ডেস্কটপ আইকনে ডাবল ক্লিক করুন
+.\install-windows.bat
 ```
-- এটি ব্যাকগ্রাউন্ডে সিস্টেম-ওয়াইড কীবোর্ড হুক সক্রিয় করবে।
-- সরাসরি ব্রাউজারে `http://127.0.0.1:8321` ওপেন হবে যেখানে ইন্টারেক্টিভ কীবোর্ড ও কনভার্টার পাওয়া যাবে।
-- যেকোনো উইন্ডোজ অ্যাপ্লিকেশনে (Notepad, Word, Chrome) সরাসরি টাইপ করতে পারবেন।
-- কীবোর্ডের `Ctrl+Alt+V`, `Ctrl+Alt+B`, `Ctrl+Alt+E`, অথবা `F12` দিয়ে মোড বদলান।
+- এটি ১০০% নেটিভ উইন্ডোজ সফটওয়্যার (Win32 GUI) হিসেবে রান করবে — কোনো ব্রাউজার খুলবে না।
+- স্ক্রিনের শীর্ষে ফ্লোটিং কীবোর্ড বার এবং প্রিভিউ উইন্ডো দেখা যাবে।
+- যেকোনো উইন্ডোজ অ্যাপ্লিকেশনে (Notepad, MS Word, Chrome, ইত্যাদি) সরাসরি বাংলা টাইপ করতে পারবেন।
+- কীবোর্ডের `Ctrl+Alt+V`, `Ctrl+Alt+B`, `Ctrl+Alt+E`, অথবা `F12` দিয়ে টাইপিং মোড বদলান।
+- ব্রাউজার মোড প্রয়োজন হলে `cargo run -p bijoy-app -- --web` দিয়ে চালানো যাবে।
 
 ### ২. সিএলআই ও টার্মিনাল REPL:
 ```bash
